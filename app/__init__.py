@@ -1,0 +1,1 @@
+"""LearnKit application package."""

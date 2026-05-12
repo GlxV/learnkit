@@ -1,0 +1,258 @@
+from __future__ import annotations
+
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QGridLayout,
+    QHBoxLayout,
+    QMessageBox,
+    QPushButton,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
+
+from app.core.services.progress_service import ProgressService
+from app.core.storage.local_storage import LocalStorage
+from app.ui.components.cards import EmptyState, ProgressLine, StatCard, StudyBlockRow, label
+from app.ui.feedback import log_action, show_toast
+from app.ui.mock_data import UIBlock, UIDataProvider, UIModule, UISubject
+from app.ui.pages.base import panel, scroll_page
+from app.ui.theme import COLORS
+
+
+class SummaryDialog(QDialog):
+    def __init__(self, title: str, markdown: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(f"Resumo - {title}")
+        self.resize(760, 620)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(22, 22, 22, 22)
+        layout.setSpacing(14)
+        layout.addWidget(label(title, "Title"))
+        viewer = QTextBrowser()
+        viewer.setOpenExternalLinks(False)
+        viewer.setMarkdown(markdown or "Este bloco ainda nao possui resumo importado.")
+        layout.addWidget(viewer, 1)
+        close = QPushButton("Fechar")
+        close.clicked.connect(self.accept)
+        layout.addWidget(close)
+
+
+class StudiesPage(QWidget):
+    def __init__(self, provider: UIDataProvider, storage: LocalStorage) -> None:
+        super().__init__()
+        self.provider = provider
+        self.storage = storage
+        self.progress_service = ProgressService(storage)
+        self.subjects: list[UISubject] = []
+        self.subject_combo: QComboBox | None = None
+        self.module_combo: QComboBox | None = None
+        self.selected_block_id: str | None = None
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        scroll, _, self.layout = scroll_page()
+        root.addWidget(scroll)
+        self.refresh()
+
+    def refresh(self) -> None:
+        self._clear_layout(self.layout)
+        self.subjects = self.provider.subjects()
+        blocks = self.provider.all_blocks()
+
+        self.layout.addWidget(label("Estudos", "Title"))
+        self.layout.addWidget(label("Escolha um destino real e continue por resumo, flashcards ou perguntas.", "Muted"))
+
+        if not blocks:
+            empty = EmptyState(
+                "Voce ainda nao tem blocos de estudo.",
+                "Importe um PDF, PPTX, TXT ou Markdown para gerar um pacote completo.",
+            )
+            empty_layout = empty.layout()
+            if empty_layout is not None:
+                action = QPushButton("Importar conteudo")
+                action.setObjectName("PrimaryButton")
+                action.clicked.connect(lambda: self._navigate("import"))
+                empty_layout.addWidget(action)
+            self.layout.addWidget(empty)
+            self.layout.addStretch()
+            return
+
+        self.layout.addLayout(self._filters())
+        selected_blocks = self._filtered_blocks() or blocks
+        current = self._best_block(selected_blocks)
+        if self.selected_block_id:
+            current = next((block for block in selected_blocks if block.id == self.selected_block_id), current)
+        self.layout.addWidget(self._continue_card(current))
+        self.layout.addLayout(self._study_modes(current))
+        self.layout.addLayout(self._content_grid(selected_blocks))
+
+    def _filters(self) -> QHBoxLayout:
+        filters = QHBoxLayout()
+        self.subject_combo = QComboBox()
+        self.subject_combo.addItems([subject.name for subject in self.subjects])
+        self.module_combo = QComboBox()
+        self.subject_combo.currentTextChanged.connect(self._refresh_modules)
+        self.module_combo.currentTextChanged.connect(lambda: self.refresh())
+        filters.addWidget(self.subject_combo)
+        filters.addWidget(self.module_combo)
+        filters.addStretch()
+        self._refresh_modules(rebuild=False)
+        return filters
+
+    def _refresh_modules(self, *_args, rebuild: bool = True) -> None:
+        if self.module_combo is None or self.subject_combo is None:
+            return
+        subject = self._selected_subject()
+        current = self.module_combo.currentText()
+        self.module_combo.blockSignals(True)
+        self.module_combo.clear()
+        if subject:
+            self.module_combo.addItems([module.name for module in subject.modules])
+        index = self.module_combo.findText(current)
+        if index >= 0:
+            self.module_combo.setCurrentIndex(index)
+        self.module_combo.blockSignals(False)
+        if rebuild:
+            self.refresh()
+
+    def _continue_card(self, block: UIBlock) -> QWidget:
+        card = panel()
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(22, 20, 22, 20)
+        layout.setSpacing(12)
+        layout.addWidget(label("Continuar de onde parou", "SectionTitle"))
+        layout.addWidget(label(block.title, "HeroTitle"))
+        layout.addWidget(label(f"{block.subject_name} > {block.module_name}", "Muted"))
+        layout.addWidget(ProgressLine(block.progress))
+        row = QHBoxLayout()
+        row.addWidget(label(f"{block.progress}% concluido", "Weak"))
+        row.addStretch()
+        row.addWidget(label(f"{block.flashcards} cards - {block.questions} perguntas", "Weak"))
+        layout.addLayout(row)
+        actions = QHBoxLayout()
+        continue_button = QPushButton("Continuar estudo")
+        continue_button.setObjectName("PrimaryButton")
+        continue_button.clicked.connect(lambda: self._record_and_open(block))
+        summary_button = QPushButton("Ver resumo")
+        summary_button.clicked.connect(lambda: self._show_summary(block))
+        actions.addWidget(continue_button)
+        actions.addWidget(summary_button)
+        actions.addStretch()
+        layout.addLayout(actions)
+        return card
+
+    def _study_modes(self, block: UIBlock) -> QGridLayout:
+        modes = QGridLayout()
+        cards = [
+            ("Resumo", "Abrir", "leitura organizada", "summary", lambda: self._show_summary(block)),
+            ("Flashcards", str(block.flashcards), "cards neste bloco", "flashcards", lambda: self._navigate("flashcards")),
+            ("Perguntas", str(block.questions), "questoes neste bloco", "questions", lambda: self._navigate("questions")),
+        ]
+        for index, (title, value, subtitle, icon, handler) in enumerate(cards):
+            wrap = panel()
+            wrap_layout = QVBoxLayout(wrap)
+            wrap_layout.setContentsMargins(16, 14, 16, 14)
+            wrap_layout.addWidget(StatCard(title, value, subtitle, icon))
+            button = QPushButton("Abrir")
+            button.setObjectName("PrimaryButton" if index == 0 else "GhostButton")
+            button.clicked.connect(handler)
+            wrap_layout.addWidget(button)
+            modes.addWidget(wrap, 0, index)
+        return modes
+
+    def _content_grid(self, blocks: list[UIBlock]) -> QHBoxLayout:
+        content = QHBoxLayout()
+        left = QVBoxLayout()
+        right = QVBoxLayout()
+        content.addLayout(left, 2)
+        content.addLayout(right, 1)
+
+        recent = panel()
+        recent_layout = QVBoxLayout(recent)
+        recent_layout.setContentsMargins(18, 16, 18, 16)
+        recent_layout.setSpacing(10)
+        recent_layout.addWidget(label("Blocos deste estudo", "SectionTitle"))
+        for block in blocks[:8]:
+            row = StudyBlockRow(block)
+            row.open_requested.connect(self.select_block_by_id)
+            recent_layout.addWidget(row)
+        left.addWidget(recent)
+
+        stats = self.provider.global_stats()
+        plan = panel()
+        plan_layout = QVBoxLayout(plan)
+        plan_layout.setContentsMargins(18, 16, 18, 16)
+        plan_layout.addWidget(label("Planejamento", "SectionTitle"))
+        plan_layout.addWidget(label(f"Flashcards revisados: {stats.flashcards_reviewed}/{stats.total_flashcards}", "Muted"))
+        plan_layout.addWidget(label(f"Perguntas respondidas: {stats.questions_answered}/{stats.total_questions}", "Muted"))
+        plan_layout.addWidget(label(f"Tempo registrado: {stats.study_time_seconds // 60} min", "Muted"))
+        right.addWidget(plan)
+
+        next_steps = panel()
+        next_layout = QVBoxLayout(next_steps)
+        next_layout.setContentsMargins(18, 16, 18, 16)
+        next_layout.addWidget(label("Proximas acoes", "SectionTitle"))
+        next_layout.addWidget(label("Revise cards marcados como dificil e responda perguntas em branco.", "Muted"))
+        import_button = QPushButton("Importar novo bloco")
+        import_button.clicked.connect(lambda: self._navigate("import"))
+        next_layout.addWidget(import_button)
+        right.addWidget(next_steps)
+        right.addStretch()
+        return content
+
+    def _filtered_blocks(self) -> list[UIBlock]:
+        module = self._selected_module()
+        if module:
+            return module.blocks
+        subject = self._selected_subject()
+        if subject:
+            return [block for module in subject.modules for block in module.blocks]
+        return []
+
+    def _best_block(self, blocks: list[UIBlock]) -> UIBlock:
+        return sorted(blocks, key=lambda item: (item.progress, item.flashcards + item.questions), reverse=True)[0]
+
+    def select_block_by_id(self, block_id: str) -> None:
+        self.selected_block_id = block_id
+        self.refresh()
+
+    def _record_and_open(self, block: UIBlock) -> None:
+        if block.id:
+            self.progress_service.record_access(block.id)
+            log_action("block_accessed", block_id=block.id)
+        self._show_summary(block)
+
+    def _show_summary(self, block: UIBlock) -> None:
+        if not block.id:
+            QMessageBox.information(self, "Resumo", "Este bloco ainda nao esta salvo no storage real.")
+            return
+        _, _, stored_block = self.storage.get_block_by_id(block.id)
+        show_toast(self, f"Abrindo resumo: {stored_block.title}", "info")
+        SummaryDialog(stored_block.title, stored_block.summary.content if stored_block.summary else "", self).exec()
+
+    def _selected_subject(self) -> UISubject | None:
+        if self.subject_combo is None:
+            return self.subjects[0] if self.subjects else None
+        return next((subject for subject in self.subjects if subject.name == self.subject_combo.currentText()), None)
+
+    def _selected_module(self) -> UIModule | None:
+        subject = self._selected_subject()
+        if not subject:
+            return None
+        if self.module_combo is None:
+            return subject.modules[0] if subject.modules else None
+        return next((module for module in subject.modules if module.name == self.module_combo.currentText()), None)
+
+    def _navigate(self, key: str) -> None:
+        window = self.window()
+        if hasattr(window, "navigate"):
+            window.navigate(key)
+
+    def _clear_layout(self, layout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                self._clear_layout(item.layout())

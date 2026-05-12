@@ -1,0 +1,32 @@
+[project]
+name = "learnkit"
+version = "0.1.0"
+description = "Local study-material organizer for PDFs and PPTX files."
+requires-python = ">=3.11"
+dependencies = [
+    "PyMuPDF>=1.24.0",
+    "Pillow>=10.0.0",
+    "python-pptx>=0.6.23",
+    "PySide6>=6.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+ocr-windows = [
+    "winrt-Windows.Foundation>=3.2.1",
+    "winrt-Windows.Foundation.Collections>=3.2.1",
+    "winrt-Windows.Globalization>=3.2.1",
+    "winrt-Windows.Graphics.Imaging>=3.2.1",
+    "winrt-Windows.Media.Ocr>=3.2.1",
+    "winrt-Windows.Storage>=3.2.1",
+    "winrt-Windows.Storage.Streams>=3.2.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
