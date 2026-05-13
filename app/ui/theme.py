@@ -190,6 +190,21 @@ QDialog {{
     background: #050B14;
 }}
 
+QDialog#NewSubjectDialog {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #050B14, stop:0.55 #07111F, stop:1 #050B14);
+}}
+
+QWidget#NewSubjectDialogContent {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #050B14, stop:0.55 #07111F, stop:1 #050B14);
+}}
+
+QFrame#DialogActionBar {{
+    background: #060F1C;
+    border-top: 1px solid {COLORS["border"]};
+}}
+
 QDialog QLabel {{
     background: transparent;
 }}
@@ -396,6 +411,26 @@ QFrame#SidebarItemFrame[active="true"] {{
 
 QFrame#SidebarItemFrame:hover {{
     background: {COLORS["card"]};
+}}
+
+QToolButton#SidebarCollapseButton {{
+    background: rgba(11, 22, 38, 0.82);
+    border: 1px solid {COLORS["border"]};
+    border-radius: 10px;
+    color: {COLORS["muted"]};
+    font-size: 18px;
+    font-weight: 800;
+}}
+
+QToolButton#SidebarCollapseButton:hover {{
+    background: #101B31;
+    border-color: {COLORS["blue"]};
+    color: {COLORS["text"]};
+}}
+
+QToolButton#SidebarCollapseButton:pressed {{
+    background: #0B1424;
+    border-color: {COLORS["purple_soft"]};
 }}
 
 QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox {{

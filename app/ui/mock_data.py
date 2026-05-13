@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from app.core.services.progress_service import ProgressService
 from app.core.storage.local_storage import LocalStorage
+from app.ui.icon_catalog import subject_icon_for_name
 
 
 @dataclass(slots=True)
@@ -142,7 +143,10 @@ class UIDataProvider:
                     description=subject.description or "Organize seus estudos em modulos e blocos personalizados.",
                     progress=subject_percent,
                     color=str(subject.color or meta.get("color", palette[index % len(palette)])),
-                    icon=str(subject.icon or meta.get("icon", "book")),
+                    icon=subject_icon_for_name(
+                        subject.name,
+                        str(subject.icon or meta.get("icon", "")),
+                    ),
                     modules=modules,
                     id=subject.id,
                     slug=subject.slug,
@@ -178,6 +182,30 @@ class UIDataProvider:
         module_service = ModuleService(self.storage)
         for module_name in initial_modules or []:
             module_service.create_module(subject.slug, module_name)
+
+    def update_subject(
+        self,
+        subject_ref: str,
+        name: str,
+        description: str | None = None,
+        color: str | None = None,
+        icon: str | None = None,
+    ) -> None:
+        from app.core.services.subject_service import SubjectService
+
+        subject = SubjectService(self.storage).update_subject(
+            subject_ref,
+            name,
+            description,
+            icon=icon,
+            color=color,
+        )
+        metadata = self._load_metadata()
+        metadata[subject.slug] = {
+            "color": color or subject.color or "#3B82F6",
+            "icon": icon or subject.icon or "book",
+        }
+        self._save_metadata(metadata)
 
     def create_module(self, subject_name: str, module_name: str, description: str | None = None) -> None:
         from app.core.services.module_service import ModuleService

@@ -118,6 +118,33 @@ SUBJECT_ICON_LABELS = {
 }
 
 
+def subject_icon_for_name(name: str, current: str | None = None) -> str:
+    if current in SUBJECT_ICONS:
+        return str(current)
+    normalized = name.casefold()
+    if "mat" in normalized or "calculo" in normalized or "cálculo" in normalized:
+        return "calculator"
+    if "fis" in normalized or "fís" in normalized:
+        return "atom"
+    if "quim" in normalized or "quím" in normalized:
+        return "flask"
+    if "bio" in normalized:
+        return "dna"
+    if "hist" in normalized:
+        return "landmark"
+    if "geo" in normalized:
+        return "globe"
+    if "port" in normalized or "lingua" in normalized or "língua" in normalized:
+        return "book"
+    if "banco" in normalized or "dados" in normalized or "sql" in normalized:
+        return "database"
+    if "estrutura" in normalized or "algorit" in normalized:
+        return "tree"
+    if "program" in normalized or "codigo" in normalized or "código" in normalized:
+        return "code"
+    return "book"
+
+
 MODULE_PRESETS = [
     "Geral",
     "1o Bimestre",

@@ -102,14 +102,18 @@ class Sidebar(QFrame):
 
         brand = QHBoxLayout()
         brand.setSpacing(14)
-        brand.addWidget(LogoMark(52))
+        self.logo = LogoMark(52)
+        brand.addWidget(self.logo)
         self.name = QLabel("LearnKit")
         self.name.setStyleSheet("font-size: 24px; font-weight: 820;")
         brand.addWidget(self.name)
         brand.addStretch()
         self.collapse_button = QToolButton()
+        self.collapse_button.setObjectName("SidebarCollapseButton")
+        self.collapse_button.setFixedSize(34, 34)
         self.collapse_button.setText("<")
         self.collapse_button.setToolTip("Recolher sidebar")
+        self.collapse_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.collapse_button.clicked.connect(self.toggle_collapsed)
         brand.addWidget(self.collapse_button)
         layout.addLayout(brand)
@@ -141,6 +145,7 @@ class Sidebar(QFrame):
     def toggle_collapsed(self) -> None:
         self.collapsed = not self.collapsed
         self.setFixedWidth(88 if self.collapsed else 260)
+        self.logo.setVisible(not self.collapsed)
         self.name.setVisible(not self.collapsed)
         self.community.setVisible(not self.collapsed)
         self.footer.setVisible(not self.collapsed)

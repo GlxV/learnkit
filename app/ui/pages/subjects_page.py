@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 from app.core.services.block_service import BlockService
 from app.core.services.module_service import ModuleService
 from app.ui.feedback import confirm_action, log_action, show_toast
-from app.ui.icon_catalog import MODULE_PRESETS, SUBJECT_ICON_LABELS, SUBJECT_ICONS
+from app.ui.icon_catalog import MODULE_PRESETS, SUBJECT_ICON_LABELS, SUBJECT_ICONS, subject_icon_for_name
 from app.ui.components.cards import EmptyState, ProgressLine, StatCard, StudyBlockRow, SubjectCard, label
 from app.ui.components.icons import LineIcon
 from app.ui.components.visual import IconBadge
@@ -83,10 +83,12 @@ class NewSubjectDialog(QDialog):
     ICONS = SUBJECT_ICONS
     MODULES = MODULE_PRESETS
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, subject: UISubject | None = None) -> None:
         super().__init__(parent)
+        self.edit_subject = subject
+        self.is_editing = subject is not None
         self.setObjectName("NewSubjectDialog")
-        self.setWindowTitle("Nova matéria personalizada")
+        self.setWindowTitle("Editar matéria" if self.is_editing else "Nova matéria personalizada")
         self.setModal(True)
         screen = QApplication.primaryScreen()
         available_height = screen.availableGeometry().height() if screen else 760
@@ -94,26 +96,44 @@ class NewSubjectDialog(QDialog):
         self.resize(720, safe_height)
         self.setMinimumSize(620, 500)
         self.setMaximumHeight(max(520, available_height - 36))
-        self.selected_color = self.COLORS[0]
-        self.selected_icon = self.ICONS[0]
+        self.selected_color = subject.color if subject and subject.color else self.COLORS[0]
+        self.selected_icon = subject_icon_for_name(subject.name, subject.icon) if subject else self.ICONS[0]
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
         scroll = QScrollArea()
+        scroll.setObjectName("NewSubjectScroll")
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.viewport().setStyleSheet("background: transparent;")
         content = QWidget()
+        content.setObjectName("NewSubjectDialogContent")
+        content.setStyleSheet(
+            """
+            QWidget#NewSubjectDialogContent {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #050B14, stop:0.55 #07111F, stop:1 #050B14);
+            }
+            """
+        )
         layout = QVBoxLayout(content)
         layout.setContentsMargins(28, 26, 28, 18)
         layout.setSpacing(14)
         scroll.setWidget(content)
         root.addWidget(scroll, 1)
 
-        layout.addWidget(label("Nova matéria personalizada", "Title"))
-        layout.addWidget(label("Crie uma área local de estudo com cor, ícone e módulos iniciais.", "Muted"))
+        layout.addWidget(label("Editar matéria" if self.is_editing else "Nova matéria personalizada", "Title"))
+        layout.addWidget(
+            label(
+                "Ajuste nome, descrição, cor e ícone desta matéria."
+                if self.is_editing
+                else "Crie uma área local de estudo com cor, ícone e módulos iniciais.",
+                "Muted",
+            )
+        )
 
         preview = panel()
         preview_layout = QHBoxLayout(preview)
@@ -180,9 +200,9 @@ class NewSubjectDialog(QDialog):
         layout.addLayout(color_row)
 
         icon_header = QHBoxLayout()
-        icon_header.addWidget(label("Icone", "SmallTitle"))
+        icon_header.addWidget(label("Ícone", "SmallTitle"))
         icon_header.addStretch()
-        icon_header.addWidget(label("100 icones prontos", "Weak"))
+        icon_header.addWidget(label("100 ícones prontos", "Weak"))
         layout.addLayout(icon_header)
         icon_scroll = QScrollArea()
         icon_scroll.setFixedHeight(176)
@@ -207,48 +227,58 @@ class NewSubjectDialog(QDialog):
         icon_scroll.setWidget(icon_container)
         layout.addWidget(icon_scroll)
 
-        module_header = QHBoxLayout()
-        module_header.addWidget(label("Módulos iniciais", "SmallTitle"))
-        module_header.addStretch()
-        module_header.addWidget(label("Escolha presets ou escreva os seus", "Weak"))
-        layout.addLayout(module_header)
-        custom_row = QHBoxLayout()
-        self.custom_module = QLineEdit()
-        self.custom_module.setPlaceholderText("Ex: Prova 5, 4º Bimestre, Unidade 7")
-        add_module = QPushButton("Adicionar módulo")
-        add_module.clicked.connect(self._add_custom_module)
-        self.custom_module.returnPressed.connect(self._add_custom_module)
-        custom_row.addWidget(self.custom_module, 1)
-        custom_row.addWidget(add_module)
-        layout.addLayout(custom_row)
-
-        module_scroll = QScrollArea()
-        module_scroll.setFixedHeight(150)
-        module_scroll.setWidgetResizable(True)
-        module_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        module_container = QWidget()
-        self.modules_grid = QGridLayout(module_container)
-        self.modules_grid.setContentsMargins(0, 0, 0, 0)
-        self.modules_grid.setHorizontalSpacing(16)
-        self.modules_grid.setVerticalSpacing(8)
         self.module_checks: list[QCheckBox] = []
-        for module in self.MODULES:
-            self._add_module_check(module, checked=module in {"Geral", "Prova 1"})
-        module_scroll.setWidget(module_container)
-        layout.addWidget(module_scroll)
+        if not self.is_editing:
+            module_header = QHBoxLayout()
+            module_header.addWidget(label("Módulos iniciais", "SmallTitle"))
+            module_header.addStretch()
+            module_header.addWidget(label("Escolha presets ou escreva os seus", "Weak"))
+            layout.addLayout(module_header)
+            custom_row = QHBoxLayout()
+            self.custom_module = QLineEdit()
+            self.custom_module.setPlaceholderText("Ex: Prova 5, 4º Bimestre, Unidade 7")
+            add_module = QPushButton("Adicionar módulo")
+            add_module.clicked.connect(self._add_custom_module)
+            self.custom_module.returnPressed.connect(self._add_custom_module)
+            custom_row.addWidget(self.custom_module, 1)
+            custom_row.addWidget(add_module)
+            layout.addLayout(custom_row)
 
-        actions = QHBoxLayout()
+            module_scroll = QScrollArea()
+            module_scroll.setFixedHeight(150)
+            module_scroll.setWidgetResizable(True)
+            module_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            module_scroll.viewport().setStyleSheet("background: transparent;")
+            module_container = QWidget()
+            module_container.setStyleSheet("background: transparent;")
+            self.modules_grid = QGridLayout(module_container)
+            self.modules_grid.setContentsMargins(0, 0, 0, 0)
+            self.modules_grid.setHorizontalSpacing(16)
+            self.modules_grid.setVerticalSpacing(8)
+            for module in self.MODULES:
+                self._add_module_check(module, checked=module in {"Geral", "Prova 1"})
+            module_scroll.setWidget(module_container)
+            layout.addWidget(module_scroll)
+
+        actions_bar = QFrame()
+        actions_bar.setObjectName("DialogActionBar")
+        actions = QHBoxLayout(actions_bar)
         actions.setContentsMargins(28, 14, 28, 22)
         actions.addStretch()
         cancel = QPushButton("Cancelar")
-        create = QPushButton("Criar matéria")
+        create = QPushButton("Salvar alterações" if self.is_editing else "Criar matéria")
         create.setObjectName("PrimaryButton")
         cancel.clicked.connect(self.reject)
         create.clicked.connect(self.accept)
         actions.addWidget(cancel)
         actions.addWidget(create)
-        root.addLayout(actions)
+        root.addWidget(actions_bar)
+        if subject:
+            self.name.setText(subject.name)
+            self.description.setPlainText(subject.description or "")
         self._refresh_color_controls()
+        self._refresh_icon_buttons()
+        self._refresh_preview()
 
     def selected_modules(self) -> list[str]:
         modules: list[str] = []
@@ -266,6 +296,8 @@ class NewSubjectDialog(QDialog):
         super().accept()
 
     def _add_module_check(self, module: str, checked: bool = True) -> None:
+        if not hasattr(self, "modules_grid"):
+            return
         if not module.strip():
             return
         if any(check.text().casefold() == module.strip().casefold() for check in self.module_checks):
@@ -277,6 +309,8 @@ class NewSubjectDialog(QDialog):
         self.modules_grid.addWidget(check, index // 3, index % 3)
 
     def _add_custom_module(self) -> None:
+        if not hasattr(self, "custom_module"):
+            return
         module = self.custom_module.text().strip()
         if not module:
             return
@@ -496,6 +530,9 @@ class SubjectsPage(QWidget):
         actions = QVBoxLayout()
         study_subject = QPushButton("Estudar materia")
         study_subject.clicked.connect(lambda: self._navigate("studies"))
+        edit_subject = QPushButton("Editar matéria")
+        edit_subject.setObjectName("GhostButton")
+        edit_subject.clicked.connect(self._edit_subject)
         create_module = QPushButton("Criar modulo")
         create_module.clicked.connect(self._new_module)
         add_block = QPushButton("Adicionar bloco")
@@ -506,6 +543,7 @@ class SubjectsPage(QWidget):
         delete_subject.clicked.connect(self._delete_subject)
         actions.addWidget(study_subject)
         actions.addWidget(add_block)
+        actions.addWidget(edit_subject)
         actions.addWidget(create_module)
         actions.addWidget(delete_subject)
         hero_layout.addLayout(actions)
@@ -630,6 +668,36 @@ class SubjectsPage(QWidget):
             self.selected_module = self.selected_subject.modules[0] if self.selected_subject.modules else None
             show_toast(self, f"Materia criada: {name}", "success")
             log_action("subject_created", subject=name)
+            self._notify_subjects_changed()
+            self._rebuild()
+
+    def _edit_subject(self) -> None:
+        if not self.selected_subject:
+            return
+        original_ref = self.selected_subject.id or self.selected_subject.name
+        dialog = NewSubjectDialog(self, self.selected_subject)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.name.text().strip():
+            name = dialog.name.text().strip()
+            self.provider.update_subject(
+                original_ref,
+                name,
+                dialog.description.toPlainText().strip(),
+                color=dialog.selected_color,
+                icon=dialog.selected_icon,
+            )
+            self.subjects = self.provider.subjects()
+            self.selected_subject = next(
+                (subject for subject in self.subjects if subject.name == name),
+                self.subjects[0] if self.subjects else None,
+            )
+            self.selected_module = (
+                self.selected_subject.modules[0]
+                if self.selected_subject and self.selected_subject.modules
+                else None
+            )
+            show_toast(self, f"Matéria atualizada: {name}", "success")
+            log_action("subject_updated", subject=name)
+            self._notify_subjects_changed()
             self._rebuild()
 
     def _new_module(self) -> None:
@@ -690,6 +758,13 @@ class SubjectsPage(QWidget):
         window = self.window()
         if hasattr(window, "navigate"):
             window.navigate(key)
+
+    def _notify_subjects_changed(self) -> None:
+        window = self.window()
+        if hasattr(window, "subjects"):
+            window.subjects = self.subjects
+        if hasattr(window, "topbar") and hasattr(window.topbar, "refresh_subjects"):
+            window.topbar.refresh_subjects(self.subjects)
 
     def _rebuild(self) -> None:
         while self.root.count():

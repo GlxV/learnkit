@@ -29,6 +29,24 @@ class SubjectService:
         self.storage.save_subject(subject)
         return subject
 
+    def update_subject(
+        self,
+        subject_ref: str,
+        name: str,
+        description: str | None = None,
+        icon: str | None = None,
+        color: str | None = None,
+    ) -> Subject:
+        self._validate_name(name, "materia")
+        subject = self.storage.get_subject(subject_ref)
+        subject.name = name.strip()
+        subject.description = description
+        subject.icon = icon
+        subject.color = color
+        subject.touch()
+        self.storage.save_subject(subject)
+        return subject
+
     def delete_subject(self, subject_ref: str) -> None:
         self.storage.delete_subject(subject_ref)
 
