@@ -178,6 +178,84 @@ class ProgressService:
         aggregate.progress_percent = int((work_done / work_total) * 100) if work_total else 0
         return aggregate
 
+    def get_review_dashboard(self, subject_ref: str | None = None) -> dict[str, Any]:
+        subjects = self.storage.list_subjects()
+        if subject_ref:
+            try:
+                selected = self.storage.get_subject(subject_ref)
+                subjects = [selected]
+            except ValueError:
+                subjects = []
+
+        summary = {
+            "due_flashcards": 0,
+            "new_flashcards": 0,
+            "future_flashcards": 0,
+            "wrong_questions": 0,
+            "correct_questions": 0,
+            "unanswered_questions": 0,
+            "pending_reviews": 0,
+        }
+        blocks: list[dict[str, Any]] = []
+        activity: list[dict[str, Any]] = []
+
+        for subject in subjects:
+            for module in self.storage.list_modules(subject.slug):
+                for block in self.storage.list_blocks(subject.slug, module.slug):
+                    progress = self.get_block_progress(block.id)
+                    flashcards = self.get_flashcard_queue(block.id)
+                    questions_all = self.get_question_queue(block.id, "all")
+                    question_counts = {
+                        "wrong": len([item for item in questions_all if item["state"] == "wrong"]),
+                        "correct": len([item for item in questions_all if item["state"] == "correct"]),
+                        "unanswered": len([item for item in questions_all if item["state"] == "unanswered"]),
+                    }
+                    flashcard_counts = {
+                        "due": len([item for item in flashcards if item["state"] == "due"]),
+                        "new": len([item for item in flashcards if item["state"] == "new"]),
+                        "future": len([item for item in flashcards if item["state"] == "future"]),
+                    }
+                    summary["due_flashcards"] += flashcard_counts["due"]
+                    summary["new_flashcards"] += flashcard_counts["new"]
+                    summary["future_flashcards"] += flashcard_counts["future"]
+                    summary["wrong_questions"] += question_counts["wrong"]
+                    summary["correct_questions"] += question_counts["correct"]
+                    summary["unanswered_questions"] += question_counts["unanswered"]
+                    pending = flashcard_counts["due"] + flashcard_counts["new"] + question_counts["wrong"] + question_counts["unanswered"]
+                    summary["pending_reviews"] += pending
+
+                    total_items = progress.flashcards_total + progress.questions_total
+                    done_items = progress.flashcards_reviewed + progress.questions_answered
+                    percent = int((done_items / total_items) * 100) if total_items else 0
+                    if total_items or pending:
+                        blocks.append(
+                            {
+                                "subject_name": subject.name,
+                                "module_name": module.name,
+                                "block_id": block.id,
+                                "block_title": block.title,
+                                "progress_percent": percent,
+                                "due_flashcards": flashcard_counts["due"],
+                                "new_flashcards": flashcard_counts["new"],
+                                "future_flashcards": flashcard_counts["future"],
+                                "wrong_questions": question_counts["wrong"],
+                                "unanswered_questions": question_counts["unanswered"],
+                                "correct_questions": question_counts["correct"],
+                                "pending_reviews": pending,
+                                "last_accessed_at": progress.last_accessed_at or "",
+                                "updated_at": progress.updated_at,
+                            }
+                        )
+                    activity.extend(self._activity_for_block(subject.name, module.name, block, progress))
+
+        blocks.sort(key=lambda item: (item["pending_reviews"], item["updated_at"]), reverse=True)
+        activity.sort(key=lambda item: item.get("occurred_at", ""), reverse=True)
+        return {
+            "summary": summary,
+            "blocks": blocks,
+            "activity": activity[:20],
+        }
+
     def _with_totals(self, progress: StudyProgress, block: StudyBlock) -> StudyProgress:
         progress.flashcards_total = len(block.flashcards)
         progress.questions_total = len(block.questions)
@@ -252,3 +330,66 @@ class ProgressService:
         if parsed.tzinfo is None:
             return parsed.replace(tzinfo=timezone.utc)
         return parsed
+
+    def _activity_for_block(
+        self,
+        subject_name: str,
+        module_name: str,
+        block: StudyBlock,
+        progress: StudyProgress,
+    ) -> list[dict[str, Any]]:
+        activity: list[dict[str, Any]] = []
+        cards_by_id = {card.id: card for card in block.flashcards}
+        questions_by_id = {question.id: question for question in block.questions}
+
+        for card_id, review in progress.flashcard_reviews.items():
+            if not isinstance(review, dict):
+                continue
+            card = cards_by_id.get(card_id)
+            activity.append(
+                {
+                    "type": "flashcard",
+                    "subject_name": subject_name,
+                    "module_name": module_name,
+                    "block_id": block.id,
+                    "block_title": block.title,
+                    "title": (card.question if card else "Flashcard")[:90],
+                    "detail": f"Marcado como {review.get('status', 'revisado')}",
+                    "occurred_at": str(review.get("last_reviewed_at", "")),
+                }
+            )
+
+        for question_id, attempts in progress.question_attempts.items():
+            if not isinstance(attempts, list):
+                continue
+            question = questions_by_id.get(question_id)
+            for attempt in attempts[-5:]:
+                if not isinstance(attempt, dict):
+                    continue
+                activity.append(
+                    {
+                        "type": "question",
+                        "subject_name": subject_name,
+                        "module_name": module_name,
+                        "block_id": block.id,
+                        "block_title": block.title,
+                        "title": (question.statement if question else "Pergunta")[:90],
+                        "detail": "Resposta correta" if attempt.get("is_correct") else "Resposta incorreta",
+                        "occurred_at": str(attempt.get("answered_at", "")),
+                    }
+                )
+
+        if progress.last_accessed_at:
+            activity.append(
+                {
+                    "type": "access",
+                    "subject_name": subject_name,
+                    "module_name": module_name,
+                    "block_id": block.id,
+                    "block_title": block.title,
+                    "title": block.title,
+                    "detail": "Bloco acessado",
+                    "occurred_at": progress.last_accessed_at,
+                }
+            )
+        return activity

@@ -77,6 +77,15 @@ Nas perguntas, o LearnKit mantém a resposta mais recente para calcular progress
 
 Isso permite revisar erros sem apagar o histórico anterior.
 
+A tela `Progresso` usa esses dados para mostrar:
+
+- flashcards vencidos;
+- flashcards novos;
+- perguntas erradas;
+- perguntas não respondidas;
+- blocos com maior prioridade de revisão;
+- atividade recente baseada em respostas e revisões reais.
+
 ## Resumo Texto e Visual
 
 Cada bloco pode ter dois modos:
