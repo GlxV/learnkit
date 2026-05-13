@@ -79,8 +79,8 @@ class DropArea(QLabel):
 
     def __init__(self) -> None:
         super().__init__(
-            "Arraste arquivos aqui ou use o botao abaixo.\n"
-            "PDF, PPTX, DOCX, TXT, MD e codigo/texto comum sao aceitos."
+            "Arraste arquivos aqui ou use o botão abaixo.\n"
+            "PDF, PPTX, DOCX, TXT, MD e código/texto comum são aceitos."
         )
         self.setObjectName("Muted")
         self.setAcceptDrops(True)
@@ -152,10 +152,10 @@ class ImportPage(QWidget):
         scroll, _, self.layout = scroll_page()
         root.addWidget(scroll)
 
-        self.layout.addWidget(label("Importacao / IA", "Title"))
+        self.layout.addWidget(label("Importação / IA", "Title"))
         self.layout.addWidget(
             label(
-                "Extraia o conteudo primeiro. A materia, o modulo e o bloco sao escolhidos no final.",
+                "Extraia o conteúdo primeiro. A matéria, o módulo e o bloco são escolhidos no final.",
                 "Muted",
             )
         )
@@ -192,7 +192,7 @@ class ImportPage(QWidget):
         layout.setSpacing(10)
         steps = [
             (1, "Arquivos"),
-            (2, "Extracao"),
+            (2, "Extração"),
             (3, "Prompt"),
             (4, "Resposta"),
             (5, "Salvar"),
@@ -256,7 +256,7 @@ class ImportPage(QWidget):
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(12)
         header = QHBoxLayout()
-        header.addWidget(label("2. Extracao", "SectionTitle"))
+        header.addWidget(label("2. Extração", "SectionTitle"))
         header.addStretch()
         self.extract_button = QPushButton("Extrair texto")
         self.extract_button.setObjectName("PrimaryButton")
@@ -286,7 +286,7 @@ class ImportPage(QWidget):
         header = QHBoxLayout()
         header.addWidget(label("3. Prompt", "SectionTitle"))
         header.addStretch()
-        self.options_button = QPushButton("Opcoes avancadas")
+        self.options_button = QPushButton("Opções avançadas")
         self.options_button.clicked.connect(self._toggle_options)
         self.generate_button = QPushButton("Gerar prompt")
         self.generate_button.setObjectName("PrimaryButton")
@@ -316,11 +316,11 @@ class ImportPage(QWidget):
         self.question_count.setRange(1, 50)
         self.question_count.setValue(10)
         self.difficulty_combo = QComboBox()
-        self.difficulty_combo.addItems(["facil", "medio", "dificil"])
+        self.difficulty_combo.addItems(["fácil", "médio", "difícil"])
         self.language_combo = QComboBox()
-        self.language_combo.addItems(["simples", "academica", "direta para prova"])
+        self.language_combo.addItems(["simples", "acadêmica", "direta para prova"])
         self.summary_mode_combo = QComboBox()
-        self.summary_mode_combo.addItems(["texto e visual", "somente texto", "visual avancado"])
+        self.summary_mode_combo.addItems(["texto e visual", "somente texto", "visual avançado"])
         options_layout.addWidget(label("Flashcards", "Weak"))
         options_layout.addWidget(self.flashcard_count)
         options_layout.addWidget(label("Perguntas", "Weak"))
@@ -369,7 +369,7 @@ class ImportPage(QWidget):
         layout.addWidget(label("5. Salvar no LearnKit", "SectionTitle"))
         layout.addWidget(
             label(
-                "Agora escolha onde o pacote de estudo sera salvo. Materias e modulos novos sao criados automaticamente.",
+                "Agora escolha onde o pacote de estudo será salvo. Matérias e módulos novos são criados automaticamente.",
                 "Muted",
             )
         )
@@ -406,15 +406,15 @@ class ImportPage(QWidget):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(12)
-        layout.addWidget(label("6. Proximo passo", "SectionTitle"))
-        self.status = label("Aguardando criacao do bloco.", "Muted")
+        layout.addWidget(label("6. Próximo passo", "SectionTitle"))
+        self.status = label("Aguardando criação do bloco.", "Muted")
         layout.addWidget(self.status)
         actions = QHBoxLayout()
         for text, target in [
             ("Abrir resumo", "studies"),
             ("Estudar flashcards", "flashcards"),
             ("Responder perguntas", "questions"),
-            ("Ir para modulo", "subjects"),
+            ("Ir para módulo", "subjects"),
         ]:
             button = QPushButton(text)
             button.setEnabled(False)
@@ -468,7 +468,7 @@ class ImportPage(QWidget):
             except ValueError:
                 pass
         if self.module_combo.count() == 0:
-            self.module_combo.addItems(["Geral", "Prova 1", "Revisao Final"])
+            self.module_combo.addItems(["Geral", "Prova 1", "Revisão Final"])
         if current_module:
             index = self.module_combo.findText(current_module)
             if index >= 0:
@@ -518,7 +518,7 @@ class ImportPage(QWidget):
         self.ai_response.clear()
         self.extraction_stats.setText("Nenhum texto extraido ainda.")
         self.response_status.setText("Aguardando resposta Markdown.")
-        self.status.setText("Aguardando criacao do bloco.")
+        self.status.setText("Aguardando criação do bloco.")
         self.generate_button.setEnabled(False)
         self.copy_button.setEnabled(False)
         self.save_button.setEnabled(False)
@@ -553,7 +553,7 @@ class ImportPage(QWidget):
         self.ai_response.clear()
         self.extraction_stats.setText("Nenhum texto extraido ainda.")
         self.response_status.setText("Aguardando resposta Markdown.")
-        self.status.setText("Aguardando criacao do bloco.")
+        self.status.setText("Aguardando criação do bloco.")
         self.generate_button.setEnabled(False)
         self.copy_button.setEnabled(False)
         self.save_button.setEnabled(False)
@@ -599,7 +599,7 @@ class ImportPage(QWidget):
         self.worker.failed.connect(self.worker_thread.quit)
         self.worker_thread.finished.connect(self.worker_thread.deleteLater)
         self.worker_thread.start()
-        show_toast(self, "Extracao iniciada.", "info")
+        show_toast(self, "Extração iniciada.", "info")
         log_action("extraction_started", file_count=len(self.selected_files))
 
     def _extraction_finished(self, result: FileExtractionResult) -> None:
@@ -663,7 +663,7 @@ class ImportPage(QWidget):
     def _toggle_options(self) -> None:
         visible = not self.options_panel.isVisible()
         self.options_panel.setVisible(visible)
-        self.options_button.setText("Ocultar opcoes" if visible else "Opcoes avancadas")
+        self.options_button.setText("Ocultar opções" if visible else "Opções avançadas")
 
     def _generate_prompt(self) -> None:
         if not self.extraction_result or not self.extraction_result.combined_content.text.strip():
@@ -723,7 +723,7 @@ class ImportPage(QWidget):
             self.parsed_response = None
             self.save_button.setEnabled(False)
             self._set_step_status(4, "error")
-            self.response_status.setText("Nao foi possivel identificar conteudo valido na resposta.")
+            self.response_status.setText("Não foi possível identificar conteúdo válido na resposta.")
             show_toast(self, "Resposta sem resumo, flashcards ou perguntas reconheciveis.", "error")
             log_action("ai_response_validation_failed", warnings=len(parsed.warnings))
             return
@@ -764,7 +764,7 @@ class ImportPage(QWidget):
         description = self.description_input.text().strip() or None
         if not subject_name or not module_name or not title:
             self._set_step_status(5, "warning")
-            show_toast(self, "Escolha ou crie uma materia, um modulo e informe o nome do bloco.", "warning")
+            show_toast(self, "Escolha ou crie uma matéria, um módulo e informe o nome do bloco.", "warning")
             return
 
         try:

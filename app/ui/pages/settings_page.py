@@ -42,8 +42,8 @@ class SettingsPage(QWidget):
         self._build()
 
     def _build(self) -> None:
-        self.layout.addWidget(label("Configuracoes", "Title"))
-        self.layout.addWidget(label("Preferencias locais, temas e armazenamento. Sem API paga ou cloud.", "Muted"))
+        self.layout.addWidget(label("Configurações", "Title"))
+        self.layout.addWidget(label("Preferências locais, temas e armazenamento. Sem API paga ou cloud.", "Muted"))
 
         self._build_appearance()
         self._build_study_settings()
@@ -67,13 +67,13 @@ class SettingsPage(QWidget):
         appearance = panel()
         form = QFormLayout(appearance)
         form.setContentsMargins(18, 16, 18, 16)
-        form.addRow(label("Aparencia", "SectionTitle"))
+        form.addRow(label("Aparência", "SectionTitle"))
 
         self.theme_preset = QComboBox()
         self.theme_preset.addItems(list(THEME_PRESETS.keys()))
         self.theme_preset.currentTextChanged.connect(self._load_preset_into_fields)
         self.density = QComboBox()
-        self.density.addItems(["Confortavel", "Compacta", "Densa"])
+        self.density.addItems(["Confortável", "Compacta", "Densa"])
         self.animations = QCheckBox()
 
         form.addRow("Preset de tema", self.theme_preset)
@@ -82,8 +82,8 @@ class SettingsPage(QWidget):
 
         for key, title in [
             ("background", "Fundo"),
-            ("background_alt", "Fundo secundario"),
-            ("surface", "Barras/superficies"),
+            ("background_alt", "Fundo secundário"),
+            ("surface", "Barras/superfícies"),
             ("card", "Cards"),
             ("card_alt", "Cards destacados"),
             ("border", "Bordas"),
@@ -111,14 +111,14 @@ class SettingsPage(QWidget):
         self.resume = QCheckBox()
         self.auto_review = QCheckBox()
         self.question_order = QComboBox()
-        self.question_order.addItems(["Ordem original", "Aleatoria", "Mais erradas primeiro"])
+        self.question_order.addItems(["Ordem original", "Aleatória", "Mais erradas primeiro"])
         self.show_explanations = QCheckBox()
         self.confirm_exit = QCheckBox()
         study_form.addRow("Iniciar onde parou", self.resume)
-        study_form.addRow("Revisao automatica", self.auto_review)
-        study_form.addRow("Ordem das questoes", self.question_order)
-        study_form.addRow("Mostrar explicacoes primeiro", self.show_explanations)
-        study_form.addRow("Confirmar saida de simulado", self.confirm_exit)
+        study_form.addRow("Revisão automática", self.auto_review)
+        study_form.addRow("Ordem das questões", self.question_order)
+        study_form.addRow("Mostrar explicações primeiro", self.show_explanations)
+        study_form.addRow("Confirmar saída de simulado", self.confirm_exit)
         self.layout.addWidget(studies)
 
     def _build_storage_settings(self) -> None:
@@ -151,7 +151,7 @@ class SettingsPage(QWidget):
         storage_form.addRow("Exportar", export_data)
         storage_form.addRow("Importar", import_data)
         storage_form.addRow("Cache", clear_cache)
-        storage_form.addRow("Backup automatico", self.backup_auto)
+        storage_form.addRow("Backup automático", self.backup_auto)
         storage_form.addRow("Backup manual", backup_now)
         self.layout.addWidget(storage)
 
@@ -164,8 +164,8 @@ class SettingsPage(QWidget):
         defaults = {
             "Buscar": "Ctrl+K",
             "Estudar agora": "Ctrl+Enter",
-            "Proxima questao": "Right",
-            "Questao anterior": "Left",
+            "Próxima questão": "Right",
+            "Questão anterior": "Left",
             "Virar flashcard": "Space",
             "Tela cheia": "F11",
         }
@@ -177,7 +177,7 @@ class SettingsPage(QWidget):
 
     def _apply_loaded_values(self) -> None:
         self._set_combo(self.theme_preset, str(self.settings.get("theme_preset", "LearnKit Dark")))
-        self._set_combo(self.density, str(self.settings.get("density", "Confortavel")))
+        self._set_combo(self.density, str(self.settings.get("density", "Confortável")))
         self._set_combo(self.question_order, str(self.settings.get("question_order", "Ordem original")))
         self.animations.setChecked(bool(self.settings.get("animations", True)))
         self.resume.setChecked(bool(self.settings.get("resume_last_block", True)))
@@ -232,7 +232,7 @@ class SettingsPage(QWidget):
         self.settings_path.parent.mkdir(parents=True, exist_ok=True)
         self.settings_path.write_text(json.dumps(self.settings, ensure_ascii=False, indent=2), encoding="utf-8")
         self._apply_theme_preview()
-        show_toast(self, "Configuracoes salvas.", "success")
+        show_toast(self, "Configurações salvas.", "success")
         log_action("settings_saved", path=self.settings_path)
 
     def _apply_theme_preview(self) -> None:
@@ -286,7 +286,7 @@ class SettingsPage(QWidget):
         if not confirm_action(
             self,
             "Importar backup",
-            "Importar este backup vai mesclar arquivos no diretorio de dados atual. Continuar?",
+            "Importar este backup vai mesclar arquivos no diretório de dados atual. Continuar?",
         ):
             return
         imported = 0

@@ -89,7 +89,8 @@ class MainWindow(QMainWindow):
         self._apply_saved_theme()
         self.provider = UIDataProvider(self.storage)
         self.subjects = self.provider.subjects()
-        self.subject_filter = "Todas as materias"
+        self.subject_filter = "Todas as matérias"
+        self._search_targets: dict[str, dict[str, str]] = {}
         log_action("app_started")
 
         central = QWidget()
@@ -109,6 +110,8 @@ class MainWindow(QMainWindow):
         content_layout.setSpacing(0)
         self.topbar = TopBar(self.subjects)
         self.topbar.search_submitted.connect(self.search_global)
+        self.topbar.search_changed.connect(self.update_search_suggestions)
+        self.topbar.search_suggestion_selected.connect(self.open_search_suggestion)
         self.topbar.subject_changed.connect(self.apply_subject_filter)
         content_layout.addWidget(self.topbar)
 
@@ -158,17 +161,38 @@ class MainWindow(QMainWindow):
         log_action("page_opened", page=key)
 
     def apply_subject_filter(self, subject_name: str) -> None:
-        self.subject_filter = subject_name or "Todas as materias"
+        self.subject_filter = subject_name or "Todas as matérias"
         page = self.stack.currentWidget()
         if hasattr(page, "set_subject_filter"):
             page.set_subject_filter(self.subject_filter)
-        elif self.subject_filter != "Todas as materias" and hasattr(page, "select_subject_by_name"):
+        elif self.subject_filter != "Todas as matérias" and hasattr(page, "select_subject_by_name"):
             page.select_subject_by_name(self.subject_filter)
         if hasattr(page, "refresh"):
             page.refresh()
         self._polish_interactive_widgets()
         self.show_toast(f"Filtro de materia: {self.subject_filter}", "info")
         log_action("subject_filter_changed", subject=self.subject_filter)
+
+    def update_search_suggestions(self, query: str) -> None:
+        query = query.strip()
+        self._search_targets = {}
+        if len(query) < 2:
+            self.topbar.set_search_suggestions([])
+            return
+        displays: list[str] = []
+        for title, subtitle, target in self._collect_search_results(query)[:12]:
+            display = f"{subtitle} • {title}"
+            while display in self._search_targets:
+                display += " "
+            self._search_targets[display] = target
+            displays.append(display)
+        self.topbar.set_search_suggestions(displays)
+
+    def open_search_suggestion(self, display: str) -> None:
+        target = self._search_targets.get(display)
+        if target:
+            self.open_search_target(target)
+            self.topbar.search.clear()
 
     def search_global(self, query: str) -> None:
         query = query.strip()
@@ -215,13 +239,15 @@ class MainWindow(QMainWindow):
         results: list[tuple[str, str, dict[str, str]]] = []
         for subject in self.storage.list_subjects():
             if normalized in subject.name.casefold():
-                results.append((subject.name, "Materia", {"kind": "subject", "subject": subject.name}))
+                results.append((subject.name, "Matéria", {"kind": "subject", "subject": subject.name}))
+            if subject.description and normalized in subject.description.casefold():
+                results.append((subject.name, "Resumo da matéria", {"kind": "subject", "subject": subject.name}))
             for module in self.storage.list_modules(subject.slug):
                 if normalized in module.name.casefold():
                     results.append(
                         (
                             module.name,
-                            f"Modulo em {subject.name}",
+                            f"Módulo em {subject.name}",
                             {"kind": "module", "subject": subject.name, "module": module.name},
                         )
                     )
@@ -229,6 +255,8 @@ class MainWindow(QMainWindow):
                     block_target = {"kind": "block", "block_id": block.id}
                     if normalized in block.title.casefold():
                         results.append((block.title, f"Bloco em {subject.name} > {module.name}", block_target))
+                    if block.summary and normalized in block.summary.content.casefold():
+                        results.append((block.title, f"Resumo em {subject.name} > {module.name}", block_target))
                     for card in block.flashcards:
                         haystack = f"{card.question} {card.answer}".casefold()
                         if normalized in haystack:

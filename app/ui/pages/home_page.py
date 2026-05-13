@@ -26,7 +26,7 @@ class HomePage(QWidget):
         super().__init__()
         self.provider = provider
         self.progress_service = ProgressService(provider.storage)
-        self.subject_filter = "Todas as materias"
+        self.subject_filter = "Todas as matérias"
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         scroll, _, self.layout = scroll_page()
@@ -36,15 +36,15 @@ class HomePage(QWidget):
     def refresh(self) -> None:
         self._clear_layout(self.layout)
         subjects = self.provider.subjects()
-        if self.subject_filter != "Todas as materias":
+        if self.subject_filter != "Todas as matérias":
             subjects = [subject for subject in subjects if subject.name == self.subject_filter]
         blocks = [block for subject in subjects for module in subject.modules for block in module.blocks]
         modules = [module for subject in subjects for module in subject.modules]
 
         title_box = QVBoxLayout()
         title_box.setSpacing(8)
-        title_box.addWidget(label("Visao geral", "Title"))
-        title_box.addWidget(label("Acompanhe materiais, revisoes e blocos salvos localmente.", "Muted"))
+        title_box.addWidget(label("Visão geral", "Title"))
+        title_box.addWidget(label("Acompanhe materiais, revisões e blocos salvos localmente.", "Muted"))
         self.layout.addLayout(title_box)
 
         self.layout.addLayout(self._stats(subjects))
@@ -87,11 +87,11 @@ class HomePage(QWidget):
         self.layout.addLayout(body)
 
     def set_subject_filter(self, subject_name: str) -> None:
-        self.subject_filter = subject_name or "Todas as materias"
+        self.subject_filter = subject_name or "Todas as matérias"
 
     def _stats(self, subjects: list[UISubject]) -> QGridLayout:
         stats_data = self.provider.global_stats()
-        if self.subject_filter != "Todas as materias":
+        if self.subject_filter != "Todas as matérias":
             total_modules = sum(len(subject.modules) for subject in subjects)
             total_blocks = sum(len(module.blocks) for subject in subjects for module in subject.modules)
             total_flashcards = sum(block.flashcards for subject in subjects for module in subject.modules for block in module.blocks)
@@ -104,8 +104,8 @@ class HomePage(QWidget):
         stats = QGridLayout()
         stats.setHorizontalSpacing(12)
         cards = [
-            StatCard("Materias", str(stats_data.total_subjects), "dados locais", "subjects", COLORS["blue"]),
-            StatCard("Modulos", str(stats_data.total_modules), "criados por voce", "activity", COLORS["purple_soft"]),
+            StatCard("Matérias", str(stats_data.total_subjects), "dados locais", "subjects", COLORS["blue"]),
+            StatCard("Módulos", str(stats_data.total_modules), "criados por você", "activity", COLORS["purple_soft"]),
             StatCard("Blocos", str(stats_data.total_blocks), "pacotes reais", "blocks", "#22D3EE"),
             StatCard(
                 "Flashcards",
@@ -128,12 +128,12 @@ class HomePage(QWidget):
 
     def _empty_home(self) -> QWidget:
         card = EmptyState(
-            "Nenhuma materia criada ainda.",
-            "Crie uma materia e importe PDF, PPTX, TXT ou Markdown para gerar o primeiro bloco de estudo.",
+            "Nenhuma matéria criada ainda.",
+            "Crie uma matéria e importe PDF, PPTX, TXT ou Markdown para gerar o primeiro bloco de estudo.",
         )
         layout = card.layout()
         if layout is not None:
-            button = QPushButton("Criar primeira materia")
+            button = QPushButton("Criar primeira matéria")
             button.setObjectName("PrimaryButton")
             button.clicked.connect(lambda: self._navigate("subjects"))
             layout.addWidget(button)
@@ -150,9 +150,9 @@ class HomePage(QWidget):
 
         if not blocks:
             layout.addWidget(
-                label("Voce ainda nao tem blocos. Importe um material para criar resumo, cards e perguntas.", "Muted")
+                label("Você ainda não tem blocos. Importe um material para criar resumo, cards e perguntas.", "Muted")
             )
-            action = QPushButton("Importar conteudo")
+            action = QPushButton("Importar conteúdo")
             action.setObjectName("PrimaryButton")
             action.clicked.connect(lambda: self._navigate("import"))
             layout.addWidget(action)
@@ -177,7 +177,7 @@ class HomePage(QWidget):
         info.addWidget(label(f"{block.subject_name} > {block.module_name}", "Muted"))
         info.addWidget(ProgressLine(block.progress))
         meta = QHBoxLayout()
-        meta.addWidget(label(f"{block.progress}% concluido", "Weak"))
+        meta.addWidget(label(f"{block.progress}% concluído", "Weak"))
         meta.addStretch()
         meta.addWidget(label(f"{block.flashcards} cards - {block.questions} perguntas", "Weak"))
         info.addLayout(meta)
@@ -206,7 +206,7 @@ class HomePage(QWidget):
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(14)
         header = QHBoxLayout()
-        header.addWidget(label("Suas materias", "SectionTitle"))
+        header.addWidget(label("Suas matérias", "SectionTitle"))
         header.addStretch()
         link = QPushButton("Ver todas")
         link.setObjectName("GhostButton")
@@ -225,7 +225,7 @@ class HomePage(QWidget):
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(14)
         header = QHBoxLayout()
-        header.addWidget(label("Modulos recentes", "SectionTitle"))
+        header.addWidget(label("Módulos recentes", "SectionTitle"))
         header.addStretch()
         all_button = QPushButton("Ver todos")
         all_button.setObjectName("GhostButton")
@@ -233,7 +233,7 @@ class HomePage(QWidget):
         header.addWidget(all_button)
         layout.addLayout(header)
         if not modules:
-            layout.addWidget(label("Nenhum modulo criado ainda.", "Muted"))
+            layout.addWidget(label("Nenhum módulo criado ainda.", "Muted"))
             layout.addStretch()
             return card
         for module in modules:
@@ -260,7 +260,7 @@ class HomePage(QWidget):
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(14)
         header = QHBoxLayout()
-        header.addWidget(label("Ultimos blocos", "SectionTitle"))
+        header.addWidget(label("Últimos blocos", "SectionTitle"))
         header.addStretch()
         all_button = QPushButton("Ver todos")
         all_button.setObjectName("GhostButton")
@@ -309,7 +309,7 @@ class HomePage(QWidget):
                 items.append(f"{progress.questions_answered} perguntas respondidas em {block.title}")
 
         if not items:
-            layout.addWidget(label("A atividade aparece aqui depois que voce estudar cards ou perguntas.", "Muted"))
+            layout.addWidget(label("A atividade aparece aqui depois que você estudar cards ou perguntas.", "Muted"))
             return card
 
         for item in items[:5]:
@@ -364,7 +364,7 @@ class HomePage(QWidget):
             self._navigate("subjects")
 
     def _open_module(self, module: UIModule) -> None:
-        subject_name = self.subject_filter if self.subject_filter != "Todas as materias" else None
+        subject_name = self.subject_filter if self.subject_filter != "Todas as matérias" else None
         if not subject_name:
             for subject in self.provider.subjects():
                 if any(item.name == module.name for item in subject.modules):

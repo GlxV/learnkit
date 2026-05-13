@@ -36,6 +36,10 @@ class SidebarItem(QFrame):
         self.style().unpolish(self)
         self.style().polish(self)
 
+    def set_collapsed(self, collapsed: bool) -> None:
+        self.text.setVisible(not collapsed)
+        self.setToolTip(self.item.label if collapsed else "")
+
     def mousePressEvent(self, event) -> None:  # type: ignore[override]
         self.clicked.emit(self.item.key)
         super().mousePressEvent(event)
@@ -90,6 +94,7 @@ class Sidebar(QFrame):
         self.setObjectName("Sidebar")
         self.setFixedWidth(260)
         self.items: dict[str, SidebarItem] = {}
+        self.collapsed = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 26, 14, 16)
@@ -98,10 +103,15 @@ class Sidebar(QFrame):
         brand = QHBoxLayout()
         brand.setSpacing(14)
         brand.addWidget(LogoMark(52))
-        name = QLabel("LearnKit")
-        name.setStyleSheet("font-size: 24px; font-weight: 820;")
-        brand.addWidget(name)
+        self.name = QLabel("LearnKit")
+        self.name.setStyleSheet("font-size: 24px; font-weight: 820;")
+        brand.addWidget(self.name)
         brand.addStretch()
+        self.collapse_button = QToolButton()
+        self.collapse_button.setText("<")
+        self.collapse_button.setToolTip("Recolher sidebar")
+        self.collapse_button.clicked.connect(self.toggle_collapsed)
+        brand.addWidget(self.collapse_button)
         layout.addLayout(brand)
         layout.addSpacing(26)
 
@@ -114,15 +124,28 @@ class Sidebar(QFrame):
                 layout.addSpacing(6)
 
         layout.addStretch()
-        layout.addWidget(CollapsibleCommunity())
+        self.community = CollapsibleCommunity()
+        layout.addWidget(self.community)
         layout.addSpacing(10)
-        footer = QLabel("Feito com codigo aberto\nv0.1.0")
-        footer.setObjectName("Weak")
-        footer.setWordWrap(True)
-        footer.setStyleSheet(f"color: {COLORS['weak']}; font-size: 12px;")
-        layout.addWidget(footer)
+        self.footer = QLabel("Feito com código aberto\nv0.1.0")
+        self.footer.setObjectName("Weak")
+        self.footer.setWordWrap(True)
+        self.footer.setStyleSheet(f"color: {COLORS['weak']}; font-size: 12px;")
+        layout.addWidget(self.footer)
         self.set_active("home")
 
     def set_active(self, key: str) -> None:
         for item_key, button in self.items.items():
             button.set_active(item_key == key)
+
+    def toggle_collapsed(self) -> None:
+        self.collapsed = not self.collapsed
+        self.setFixedWidth(88 if self.collapsed else 260)
+        self.name.setVisible(not self.collapsed)
+        self.community.setVisible(not self.collapsed)
+        self.footer.setVisible(not self.collapsed)
+        self.collapse_button.setText(">" if self.collapsed else "<")
+        self.collapse_button.setToolTip("Expandir sidebar" if self.collapsed else "Recolher sidebar")
+        for item in self.items.values():
+            item.set_collapsed(self.collapsed)
+        log_action("sidebar_collapsed", collapsed=self.collapsed)

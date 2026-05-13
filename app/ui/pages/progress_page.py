@@ -17,7 +17,7 @@ class ProgressPage(QWidget):
         self.provider = provider
         self.storage = storage
         self.progress_service = ProgressService(storage)
-        self.subject_filter = "Todas as materias"
+        self.subject_filter = "Todas as matérias"
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         scroll, _, self.layout = scroll_page()
@@ -27,12 +27,12 @@ class ProgressPage(QWidget):
     def refresh(self) -> None:
         self._clear_layout(self.layout)
         subjects = self.provider.subjects()
-        if self.subject_filter != "Todas as materias":
+        if self.subject_filter != "Todas as matérias":
             subjects = [subject for subject in subjects if subject.name == self.subject_filter]
-        stats = self.provider.global_stats() if self.subject_filter == "Todas as materias" else self._stats_for_subjects(subjects)
+        stats = self.provider.global_stats() if self.subject_filter == "Todas as matérias" else self._stats_for_subjects(subjects)
 
         self.layout.addWidget(label("Progresso", "Title"))
-        self.layout.addWidget(label("Estatisticas calculadas a partir dos blocos salvos localmente.", "Muted"))
+        self.layout.addWidget(label("Estatísticas calculadas a partir dos blocos salvos localmente.", "Muted"))
 
         cards = QGridLayout()
         cards.setHorizontalSpacing(12)
@@ -40,7 +40,7 @@ class ProgressPage(QWidget):
             StatCard("Progresso geral", f"{stats.progress_percent}%", "cards + perguntas", "activity", COLORS["blue"]),
             StatCard("Tempo total", f"{stats.study_time_seconds // 60} min", "registrado", "clock", COLORS["purple_soft"]),
             StatCard("Perguntas", str(stats.questions_answered), "respondidas", "questions", "#EC4899"),
-            StatCard("Acertos", str(stats.questions_correct), "questoes corretas", "check", COLORS["green"]),
+            StatCard("Acertos", str(stats.questions_correct), "questões corretas", "check", COLORS["green"]),
             StatCard("Flashcards", str(stats.flashcards_reviewed), "revisados", "flashcards", COLORS["amber"]),
         ]
         for index, card in enumerate(top_cards):
@@ -48,10 +48,10 @@ class ProgressPage(QWidget):
         self.layout.addLayout(cards)
 
         if not subjects:
-            empty = EmptyState("Nenhum progresso ainda.", "Crie uma materia e importe conteudo para comecar.")
+            empty = EmptyState("Nenhum progresso ainda.", "Crie uma matéria e importe conteúdo para começar.")
             empty_layout = empty.layout()
             if empty_layout is not None:
-                button = QPushButton("Importar conteudo")
+                button = QPushButton("Importar conteúdo")
                 button.setObjectName("PrimaryButton")
                 button.clicked.connect(lambda: self._navigate("import"))
                 empty_layout.addWidget(button)
@@ -69,7 +69,7 @@ class ProgressPage(QWidget):
         self.layout.addLayout(grid)
 
     def set_subject_filter(self, subject_name: str) -> None:
-        self.subject_filter = subject_name or "Todas as materias"
+        self.subject_filter = subject_name or "Todas as matérias"
 
     def _stats_for_subjects(self, subjects):
         from app.core.models.progress import AggregateProgress
@@ -100,13 +100,13 @@ class ProgressPage(QWidget):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(14)
-        layout.addWidget(label("Visao geral", "SectionTitle"))
+        layout.addWidget(label("Visão geral", "SectionTitle"))
         row = QHBoxLayout()
         row.addWidget(ProgressRing(percent, 132))
         details = QVBoxLayout()
         details.addWidget(label(f"Flashcards cadastrados: {total_cards}", "Muted"))
         details.addWidget(label(f"Perguntas cadastradas: {total_questions}", "Muted"))
-        details.addWidget(label("A porcentagem sobe quando voce revisa cards ou responde perguntas.", "Weak"))
+        details.addWidget(label("A porcentagem sobe quando você revisa cards ou responde perguntas.", "Weak"))
         row.addLayout(details, 1)
         layout.addLayout(row)
         layout.addWidget(ProgressLine(percent))
@@ -117,7 +117,7 @@ class ProgressPage(QWidget):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(12)
-        layout.addWidget(label("Progresso por materia", "SectionTitle"))
+        layout.addWidget(label("Progresso por matéria", "SectionTitle"))
         for subject in subjects:
             row = QHBoxLayout()
             row.addWidget(label(subject.name, "SmallTitle"), 1)
@@ -132,10 +132,10 @@ class ProgressPage(QWidget):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(12)
-        layout.addWidget(label("Conclusao por modulo", "SectionTitle"))
+        layout.addWidget(label("Conclusão por módulo", "SectionTitle"))
         modules = [module for subject in subjects for module in subject.modules]
         if not modules:
-            layout.addWidget(label("Nenhum modulo criado ainda.", "Muted"))
+            layout.addWidget(label("Nenhum módulo criado ainda.", "Muted"))
             return card
         for module in modules[:8]:
             row = QHBoxLayout()
@@ -153,7 +153,7 @@ class ProgressPage(QWidget):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(14)
-        layout.addWidget(label("Precisao nas perguntas", "SectionTitle"))
+        layout.addWidget(label("Precisão nas perguntas", "SectionTitle"))
         row = QHBoxLayout()
         row.addWidget(ProgressRing(percent, 118))
         details = QVBoxLayout()

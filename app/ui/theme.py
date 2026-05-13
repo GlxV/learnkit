@@ -146,6 +146,7 @@ def polish_combo_box(combo: QComboBox) -> None:
     view.setFrameShape(QFrame.Shape.NoFrame)
     view.setContentsMargins(0, 0, 0, 0)
     view.viewport().setAutoFillBackground(True)
+    view.window().setStyleSheet("background: transparent; border: 0; margin: 0; padding: 0;")
     view.setStyleSheet(
         """
         QListView {
@@ -481,9 +482,9 @@ QComboBox QAbstractItemView {{
 }}
 
 QComboBoxPrivateContainer {{
-    background: #0B1626;
-    border: 1px solid {COLORS["border"]};
-    border-radius: 10px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     margin: 0;
     padding: 0;
 }}
