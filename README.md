@@ -86,6 +86,8 @@ A tela `Progresso` usa esses dados para mostrar:
 - blocos com maior prioridade de revisão;
 - atividade recente baseada em respostas e revisões reais.
 
+A Home também usa esse dashboard: o card `Continuar estudando` prioriza blocos com pendências reais, e o painel `Revisar agora` aponta direto para flashcards ou perguntas conforme a necessidade.
+
 ## Resumo Texto e Visual
 
 Cada bloco pode ter dois modos:
