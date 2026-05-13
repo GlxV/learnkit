@@ -136,6 +136,8 @@ class LocalStorage:
             (path / "ai_response.md").write_text(block.ai_response_raw, encoding="utf-8")
         if block.summary:
             (path / "summary.md").write_text(block.summary.content, encoding="utf-8")
+        if block.summary_visual:
+            (path / "summary_visual.json").write_text(block.summary_visual, encoding="utf-8")
         if block.flashcards:
             self._write_json(
                 path / "flashcards.json",

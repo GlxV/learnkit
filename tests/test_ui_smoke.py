@@ -15,4 +15,4 @@ def test_main_window_instantiates_offscreen() -> None:
     window = MainWindow()
 
     assert window.windowTitle() == "LearnKit"
-    assert window.stack.count() == 8
+    assert window.stack.count() == 9

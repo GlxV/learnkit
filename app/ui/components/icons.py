@@ -93,6 +93,12 @@ class LineIcon(QWidget):
             painter.drawLine(QPointF(14, 15), QPointF(20, 8))
             painter.drawLine(QPointF(17, 8), QPointF(20, 8))
             painter.drawLine(QPointF(20, 8), QPointF(20, 11))
+        elif kind == "database":
+            painter.drawEllipse(QRectF(5, 4, 14, 6))
+            painter.drawLine(QPointF(5, 7), QPointF(5, 17))
+            painter.drawLine(QPointF(19, 7), QPointF(19, 17))
+            painter.drawEllipse(QRectF(5, 14, 14, 6))
+            painter.drawArc(QRectF(5, 9, 14, 6), 180 * 16, 180 * 16)
         elif kind == "import":
             painter.drawRoundedRect(QRectF(6, 7, 12, 12), 2, 2)
             painter.drawLine(QPointF(12, 4), QPointF(12, 14))

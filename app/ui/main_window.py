@@ -20,12 +20,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.core.storage.local_storage import LocalStorage
+from app.core.database import SQLiteStorage
 from app.ui.components.sidebar import Sidebar
 from app.ui.components.toast import Toast
 from app.ui.components.topbar import TopBar
 from app.ui.feedback import log_action
 from app.ui.mock_data import UIDataProvider
+from app.ui.pages.database_page import DatabasePage
 from app.ui.pages.flashcards_page import FlashcardsPage
 from app.ui.pages.home_page import HomePage
 from app.ui.pages.import_page import ImportPage
@@ -84,7 +85,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("LearnKit")
         self.resize(1440, 900)
-        self.storage = LocalStorage("data")
+        self.storage = SQLiteStorage("data/learnkit.db")
         self._apply_saved_theme()
         self.provider = UIDataProvider(self.storage)
         self.subjects = self.provider.subjects()
@@ -122,6 +123,7 @@ class MainWindow(QMainWindow):
             "flashcards": FlashcardsPage(self.provider, self.storage),
             "questions": QuestionsPage(self.provider, self.storage),
             "progress": ProgressPage(self.provider, self.storage),
+            "database": DatabasePage(self.storage),
             "import": ImportPage(self.subjects, self.storage),
             "settings": SettingsPage(self.storage),
         }

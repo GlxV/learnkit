@@ -17,6 +17,7 @@ NAV_ITEMS = [
     NavItem("flashcards", "Flashcards", "flashcards"),
     NavItem("questions", "Perguntas", "questions"),
     NavItem("progress", "Progresso", "progress"),
+    NavItem("database", "Banco de Dados", "database"),
     NavItem("import", "Importação/IA", "import"),
     NavItem("settings", "Configurações", "settings"),
 ]

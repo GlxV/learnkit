@@ -14,16 +14,21 @@ class ProgressService:
 
     def get_block_progress(self, block_id: str) -> StudyProgress:
         subject, module, block = self.storage.get_block_by_id(block_id)
-        path = self.storage.block_path(subject.slug, module.slug, block.slug) / "progress.json"
-        progress = StudyProgress.from_dict(
-            json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
-        )
+        if hasattr(self.storage, "get_progress"):
+            progress = self.storage.get_progress(block_id)
+        else:
+            path = self.storage.block_path(subject.slug, module.slug, block.slug) / "progress.json"
+            progress = StudyProgress.from_dict(
+                json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+            )
         return self._with_totals(progress, block)
 
     def save_block_progress(self, block_id: str, progress: StudyProgress) -> StudyProgress:
         subject, module, block = self.storage.get_block_by_id(block_id)
         progress = self._with_totals(progress, block)
         progress.updated_at = utc_now()
+        if hasattr(self.storage, "save_progress"):
+            return self.storage.save_progress(block_id, progress)
         path = self.storage.block_path(subject.slug, module.slug, block.slug) / "progress.json"
         path.write_text(json.dumps(progress.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
         return progress

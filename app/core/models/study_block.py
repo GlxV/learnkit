@@ -24,6 +24,8 @@ class StudyBlock:
     generated_prompt: str = ""
     ai_response_raw: str = ""
     ai_response: AIResponse | None = None
+    summary_visual: str = ""
+    preferred_summary_mode: str = "text"
     summary: Summary | None = None
     flashcards: list[Flashcard] = field(default_factory=list)
     questions: list[Question] = field(default_factory=list)
@@ -49,6 +51,8 @@ class StudyBlock:
             "generated_prompt": self.generated_prompt,
             "ai_response_raw": self.ai_response_raw,
             "ai_response": self.ai_response.to_dict() if self.ai_response else None,
+            "summary_visual": self.summary_visual,
+            "preferred_summary_mode": self.preferred_summary_mode,
             "summary": self.summary.to_dict() if self.summary else None,
             "flashcards": [card.to_dict() for card in self.flashcards],
             "questions": [question.to_dict() for question in self.questions],
@@ -73,6 +77,8 @@ class StudyBlock:
             generated_prompt=str(safe.get("generated_prompt", "")),
             ai_response_raw=str(safe.get("ai_response_raw", "")),
             ai_response=AIResponse.from_dict(safe.get("ai_response")),
+            summary_visual=str(safe.get("summary_visual", "")),
+            preferred_summary_mode=str(safe.get("preferred_summary_mode", "text")),
             summary=Summary.from_dict(safe.get("summary")),
             flashcards=[Flashcard.from_dict(item) for item in safe.get("flashcards", [])],
             questions=[Question.from_dict(item) for item in safe.get("questions", [])],
