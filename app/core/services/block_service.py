@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from app.core.extractors.file_extractor import FileExtractionResult, FileExtractor
@@ -237,6 +238,33 @@ class BlockService:
         self._ensure_progress_file(block.id)
         return block
 
+    def update_summary_modes(
+        self,
+        block_id: str,
+        summary_markdown: str | None = None,
+        summary_visual: str | None = None,
+        preferred_summary_mode: str | None = None,
+    ) -> StudyBlock:
+        subject, module, block = self.storage.get_block_by_id(block_id)
+        if summary_markdown is not None:
+            block.summary = Summary(content=summary_markdown) if summary_markdown.strip() else None
+
+        if summary_visual is not None:
+            block.summary_visual = self._normalize_summary_visual(summary_visual)
+
+        if preferred_summary_mode is not None:
+            if preferred_summary_mode not in {"text", "visual"}:
+                raise ValueError("Modo de resumo invalido.")
+            if preferred_summary_mode == "visual" and not block.summary_visual.strip():
+                raise ValueError("Resumo visual precisa existir para usar o modo visual.")
+            block.preferred_summary_mode = preferred_summary_mode
+        elif block.preferred_summary_mode == "visual" and not block.summary_visual.strip():
+            block.preferred_summary_mode = "text"
+
+        block.touch()
+        self.storage.save_block(subject, module, block)
+        return block
+
     def _merge_extracted_content(
         self,
         current: ExtractedContent,
@@ -254,6 +282,18 @@ class BlockService:
     def _validate_title(self, value: str) -> None:
         if not value or not value.strip():
             raise ValueError("O titulo do bloco nao pode ficar vazio.")
+
+    def _normalize_summary_visual(self, value: str) -> str:
+        raw = value.strip()
+        if not raw:
+            return ""
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Resumo visual possui JSON invalido: {exc.msg}") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError("Resumo visual precisa ser um objeto JSON.")
+        return json.dumps(parsed, ensure_ascii=False, indent=2)
 
     def _ensure_progress_file(self, block_id: str) -> None:
         from app.core.services.progress_service import ProgressService

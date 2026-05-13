@@ -86,6 +86,8 @@ O app não executa HTML bruto vindo da IA. Se o JSON visual estiver inválido, o
 
 Dentro do resumo visual existe o botão `Modo apresentação`, que abre o conteúdo em uma tela maior e permite navegar por seções como slides usando os botões ou setas do teclado.
 
+O diálogo de resumo também permite editar e salvar o Markdown do modo Texto e o JSON do modo Visual. O LearnKit valida o JSON visual antes de salvar para evitar quebrar a apresentação.
+
 ## Instalar
 
 Requisitos:

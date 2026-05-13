@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -7,6 +9,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QStackedWidget,
     QTextBrowser,
@@ -14,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.core.services.block_service import BlockService
 from app.core.services.progress_service import ProgressService
 from app.core.storage.local_storage import LocalStorage
 from app.ui.components.cards import EmptyState, ProgressLine, StatCard, StudyBlockRow, label
@@ -22,6 +26,88 @@ from app.ui.feedback import log_action, show_toast
 from app.ui.mock_data import UIBlock, UIDataProvider, UIModule, UISubject
 from app.ui.pages.base import panel, scroll_page
 from app.ui.theme import COLORS
+
+
+class SummaryEditDialog(QDialog):
+    def __init__(self, block, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Editar resumo")
+        self.resize(880, 700)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+
+        layout.addWidget(label("Editar resumo", "Title"))
+        layout.addWidget(label("Ajuste o Markdown do modo Texto e, opcionalmente, o JSON do modo Visual.", "Muted"))
+
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem("Texto", "text")
+        self.mode_combo.addItem("Visual", "visual")
+        self.mode_combo.setCurrentIndex(1 if block.preferred_summary_mode == "visual" else 0)
+        layout.addWidget(self.mode_combo)
+
+        layout.addWidget(label("Resumo em texto", "SectionTitle"))
+        self.text_editor = QPlainTextEdit()
+        self.text_editor.setPlaceholderText("Resumo em Markdown")
+        self.text_editor.setPlainText(block.summary.content if block.summary else "")
+        self.text_editor.setMinimumHeight(220)
+        layout.addWidget(self.text_editor)
+
+        layout.addWidget(label("Resumo visual em JSON", "SectionTitle"))
+        self.visual_editor = QPlainTextEdit()
+        self.visual_editor.setPlaceholderText('{"title":"...","sections":[]}')
+        self.visual_editor.setPlainText(block.summary_visual or "")
+        self.visual_editor.setMinimumHeight(240)
+        layout.addWidget(self.visual_editor)
+
+        self.status = label("JSON visual vazio é permitido; nesse caso o app usa o modo Texto.", "Weak")
+        layout.addWidget(self.status)
+
+        actions = QHBoxLayout()
+        validate = QPushButton("Validar JSON visual")
+        validate.clicked.connect(self._validate_visual)
+        cancel = QPushButton("Cancelar")
+        cancel.clicked.connect(self.reject)
+        save = QPushButton("Salvar resumo")
+        save.setObjectName("PrimaryButton")
+        save.clicked.connect(self._accept_if_valid)
+        actions.addWidget(validate)
+        actions.addStretch()
+        actions.addWidget(cancel)
+        actions.addWidget(save)
+        layout.addLayout(actions)
+
+    def values(self) -> tuple[str, str, str]:
+        return (
+            self.text_editor.toPlainText(),
+            self.visual_editor.toPlainText(),
+            str(self.mode_combo.currentData() or "text"),
+        )
+
+    def _validate_visual(self) -> bool:
+        raw = self.visual_editor.toPlainText().strip()
+        if not raw:
+            self.status.setText("Sem JSON visual. O modo Texto continuará disponível.")
+            show_toast(self, "Resumo visual vazio.", "info")
+            return True
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            self.status.setText(f"JSON inválido: {exc.msg}")
+            show_toast(self, f"JSON visual inválido: {exc.msg}", "warning")
+            return False
+        if not isinstance(parsed, dict):
+            self.status.setText("JSON visual precisa ser um objeto.")
+            show_toast(self, "JSON visual precisa ser um objeto.", "warning")
+            return False
+        self.visual_editor.setPlainText(json.dumps(parsed, ensure_ascii=False, indent=2))
+        self.status.setText("JSON visual válido.")
+        show_toast(self, "JSON visual válido.", "success")
+        return True
+
+    def _accept_if_valid(self) -> None:
+        if self._validate_visual():
+            self.accept()
 
 
 class SummaryDialog(QDialog):
@@ -52,8 +138,7 @@ class SummaryDialog(QDialog):
         copy = QPushButton("Copiar")
         copy.clicked.connect(self._copy_current)
         edit = QPushButton("Editar")
-        edit.setEnabled(False)
-        edit.setToolTip("Editor de resumo fica para uma versão futura.")
+        edit.clicked.connect(self._edit_summary)
         self.presentation = QPushButton("Modo apresentação")
         self.presentation.clicked.connect(self._open_presentation)
         self.presentation.setEnabled(bool(self.block.summary_visual.strip()))
@@ -107,6 +192,39 @@ class SummaryDialog(QDialog):
         dialog.showMaximized()
         dialog.exec()
 
+    def _edit_summary(self) -> None:
+        dialog = SummaryEditDialog(self.block, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        summary_text, summary_visual, preferred = dialog.values()
+        try:
+            updated = BlockService(self.storage).update_summary_modes(
+                self.block.id,
+                summary_markdown=summary_text,
+                summary_visual=summary_visual,
+                preferred_summary_mode=preferred,
+            )
+        except ValueError as exc:
+            QMessageBox.warning(self, "Resumo inválido", str(exc))
+            return
+        self.block = updated
+        self._reload_views()
+        show_toast(self, "Resumo salvo.", "success")
+        log_action("summary_edited", block_id=self.block.id, preferred=self.block.preferred_summary_mode)
+
+    def _reload_views(self) -> None:
+        self.subject, self.module, self.block = self.storage.get_block_by_id(self.block.id)
+        markdown = self.block.summary.content if self.block.summary else ""
+        self.text_viewer.setMarkdown(markdown or "Este bloco ainda não possui resumo importado.")
+        self.stack.removeWidget(self.visual_viewer)
+        self.visual_viewer.deleteLater()
+        self.visual_viewer = VisualSummaryWidget(self.block.summary_visual)
+        self.stack.addWidget(self.visual_viewer)
+        self.presentation.setEnabled(bool(self.block.summary_visual.strip()))
+        self.presentation.setToolTip("" if self.presentation.isEnabled() else "Disponível quando houver resumo visual.")
+        preferred = self.block.preferred_summary_mode if self.block.summary_visual else "text"
+        self._set_mode(preferred, save=False)
+
 
 class StudiesPage(QWidget):
     def __init__(self, provider: UIDataProvider, storage: LocalStorage) -> None:
@@ -134,12 +252,12 @@ class StudiesPage(QWidget):
 
         if not blocks:
             empty = EmptyState(
-                "Voce ainda nao tem blocos de estudo.",
+                "Você ainda não tem blocos de estudo.",
                 "Importe um PDF, PPTX, TXT ou Markdown para gerar um pacote completo.",
             )
             empty_layout = empty.layout()
             if empty_layout is not None:
-                action = QPushButton("Importar conteudo")
+                action = QPushButton("Importar conteúdo")
                 action.setObjectName("PrimaryButton")
                 action.clicked.connect(lambda: self._navigate("import"))
                 empty_layout.addWidget(action)
@@ -195,7 +313,7 @@ class StudiesPage(QWidget):
         layout.addWidget(label(f"{block.subject_name} > {block.module_name}", "Muted"))
         layout.addWidget(ProgressLine(block.progress))
         row = QHBoxLayout()
-        row.addWidget(label(f"{block.progress}% concluido", "Weak"))
+        row.addWidget(label(f"{block.progress}% concluído", "Weak"))
         row.addStretch()
         row.addWidget(label(f"{block.flashcards} cards - {block.questions} perguntas", "Weak"))
         layout.addLayout(row)
@@ -216,7 +334,7 @@ class StudiesPage(QWidget):
         cards = [
             ("Resumo", "Abrir", "leitura organizada", "summary", lambda: self._show_summary(block)),
             ("Flashcards", str(block.flashcards), "cards neste bloco", "flashcards", lambda: self._navigate("flashcards")),
-            ("Perguntas", str(block.questions), "questoes neste bloco", "questions", lambda: self._navigate("questions")),
+            ("Perguntas", str(block.questions), "questões neste bloco", "questions", lambda: self._navigate("questions")),
         ]
         for index, (title, value, subtitle, icon, handler) in enumerate(cards):
             wrap = panel()
@@ -261,8 +379,8 @@ class StudiesPage(QWidget):
         next_steps = panel()
         next_layout = QVBoxLayout(next_steps)
         next_layout.setContentsMargins(18, 16, 18, 16)
-        next_layout.addWidget(label("Proximas acoes", "SectionTitle"))
-        next_layout.addWidget(label("Revise cards marcados como dificil e responda perguntas em branco.", "Muted"))
+        next_layout.addWidget(label("Próximas ações", "SectionTitle"))
+        next_layout.addWidget(label("Revise cards marcados como difícil e responda perguntas em branco.", "Muted"))
         import_button = QPushButton("Importar novo bloco")
         import_button.clicked.connect(lambda: self._navigate("import"))
         next_layout.addWidget(import_button)
