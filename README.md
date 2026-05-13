@@ -130,6 +130,36 @@ Requisitos:
 - Pillow
 - pytest para desenvolvimento
 
+### Instalação automática no Windows
+
+Para preparar uma máquina Windows do zero, use o instalador:
+
+```powershell
+.\install_learnkit_windows.bat
+```
+
+Ele faz, em sequência:
+
+- verifica ou instala Python 3.11+ via `winget`;
+- cria o ambiente virtual local `.venv`;
+- instala as dependências do `requirements.txt`;
+- tenta configurar os idiomas de OCR local do Windows (`pt-BR` e `en-US`) quando executado como administrador;
+- instala o Tesseract OCR como fallback quando `winget` está disponível;
+- baixa o idioma português do Tesseract quando necessário;
+- testa se as dependências principais e algum backend OCR ficaram disponíveis.
+
+Se a instalação dos idiomas OCR do Windows exigir permissão, execute o `.bat` como administrador. Mesmo sem administrador, o app continua funcionando e tenta usar o Tesseract como OCR local.
+
+Depois da instalação, abra o app com:
+
+```powershell
+.\abrir_learnkit.bat
+```
+
+O atalho usa automaticamente `.venv\Scripts\python.exe` quando o ambiente virtual existir.
+
+### Instalação manual
+
 ```powershell
 python -m pip install -r requirements.txt
 ```
@@ -228,7 +258,7 @@ Roteiro para demonstrar ao professor:
 
 O LearnKit tenta extrair texto de imagens em PDFs, PPTX e DOCX quando existe um backend OCR local disponível.
 
-No Windows, o backend usado é o OCR local do sistema via pacotes `winrt-*`. Ele não usa cloud. Se esses pacotes ou idiomas OCR não estiverem disponíveis, o app continua extraindo texto normal e mostra avisos para arquivos com imagens.
+No Windows, o app tenta usar primeiro o OCR local do sistema via pacotes `winrt-*`. Se ele não estiver disponível, tenta usar Tesseract OCR com `pytesseract`. Nenhum desses caminhos usa cloud. Se nenhum backend OCR estiver pronto, o app continua extraindo texto normal e mostra avisos para arquivos com imagens.
 
 ## CLI temporária
 
