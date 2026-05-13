@@ -21,6 +21,7 @@ class StudyProgress:
     questions_wrong: int = 0
     answered_questions: dict[str, dict[str, Any]] = field(default_factory=dict)
     reviewed_flashcards: dict[str, str] = field(default_factory=dict)
+    flashcard_reviews: dict[str, dict[str, Any]] = field(default_factory=dict)
     study_time_seconds: int = 0
     last_accessed_at: str | None = None
     updated_at: str = field(default_factory=utc_now)
@@ -40,6 +41,7 @@ class StudyProgress:
             "questions_wrong": self.questions_wrong,
             "answered_questions": self.answered_questions,
             "reviewed_flashcards": self.reviewed_flashcards,
+            "flashcard_reviews": self.flashcard_reviews,
             "study_time_seconds": self.study_time_seconds,
             "last_accessed_at": self.last_accessed_at,
             "updated_at": self.updated_at,
@@ -62,6 +64,7 @@ class StudyProgress:
             questions_wrong=int(safe.get("questions_wrong", 0)),
             answered_questions=dict(safe.get("answered_questions", {})),
             reviewed_flashcards=dict(safe.get("reviewed_flashcards", {})),
+            flashcard_reviews=dict(safe.get("flashcard_reviews", {})),
             study_time_seconds=int(safe.get("study_time_seconds", 0)),
             last_accessed_at=safe.get("last_accessed_at"),
             updated_at=str(safe.get("updated_at", utc_now())),

@@ -49,6 +49,7 @@ O progresso é persistido no banco. O app salva:
 
 - flashcards revisados;
 - status do card: `again`, `hard`, `good`, `easy`;
+- agendamento do card: facilidade, intervalo, próxima revisão e quantidade de revisões;
 - perguntas respondidas;
 - alternativa escolhida;
 - se a resposta estava correta;
@@ -56,6 +57,15 @@ O progresso é persistido no banco. O app salva:
 - porcentagem agregada por bloco, módulo, matéria e global.
 
 Ao fechar e abrir o app, os dados continuam salvos.
+
+Os flashcards usam um agendamento simples inspirado no Anki, sem limite diário:
+
+- `Repetir`: volta como vencido rapidamente;
+- `Difícil`: mantém intervalo curto;
+- `Bom`: aumenta o intervalo de revisão;
+- `Dominei`: aumenta mais o intervalo e a facilidade.
+
+A fila mostra cards vencidos primeiro, cards novos depois e cards futuros por último.
 
 ## Resumo Texto e Visual
 

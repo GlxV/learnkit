@@ -48,8 +48,8 @@ class FlashcardsPage(QWidget):
         if not [block for block in self.provider.all_blocks() if block.flashcards]:
             self.layout.addWidget(
                 EmptyState(
-                    "Nenhum flashcard disponivel.",
-                    "Importe uma resposta da IA em um bloco para comecar a revisar flashcards reais.",
+                    "Nenhum flashcard disponível.",
+                    "Importe uma resposta da IA em um bloco para começar a revisar flashcards reais.",
                 )
             )
             return
@@ -123,7 +123,10 @@ class FlashcardsPage(QWidget):
         self.current_block = block
         self.cards = block.flashcards
         self.current_index = 0
-        self.session_queue = list(range(len(self.cards)))
+        self.session_queue = [
+            int(item["index"])
+            for item in self.progress_service.get_flashcard_queue(block.id)
+        ]
         self.queue_position = 0
         self._render_session()
 
@@ -138,8 +141,8 @@ class FlashcardsPage(QWidget):
         if not self.current_block or not self.cards:
             self.body.addWidget(
                 EmptyState(
-                    "Este bloco ainda nao possui flashcards.",
-                    "Importe uma resposta da IA para criar cards de revisao.",
+                    "Este bloco ainda não possui flashcards.",
+                    "Importe uma resposta da IA para criar cards de revisão.",
                 )
             )
             return
@@ -158,6 +161,9 @@ class FlashcardsPage(QWidget):
         left_layout.addStretch()
 
         center = QVBoxLayout()
+        self.session_queue = self._fresh_queue_indices()
+        if self.queue_position >= len(self.session_queue):
+            self.queue_position = max(0, len(self.session_queue) - 1)
         self.current_index = self.session_queue[self.queue_position] if self.session_queue else 0
         card = self.cards[self.current_index]
         self.viewer = FlashcardViewer(card.question, card.answer)
@@ -166,7 +172,7 @@ class FlashcardsPage(QWidget):
         for text, handler, style in [
             ("Anterior", self._previous, ""),
             ("Repetir", lambda: self._mark("again"), "danger"),
-            ("Dificil", lambda: self._mark("hard"), "warning"),
+            ("Difícil", lambda: self._mark("hard"), "warning"),
             ("Bom", lambda: self._mark("good"), "good"),
             ("Dominei", lambda: self._mark("easy"), "primary"),
             ("Pular", lambda: self._mark("skipped"), ""),
@@ -185,7 +191,7 @@ class FlashcardsPage(QWidget):
         center.addLayout(controls)
         center.addWidget(
             label(
-                "Repetir volta logo. Dificil reaparece depois. Bom segue. Dominei conclui o card.",
+                "Repetir volta logo. Difícil reaparece depois. Bom segue. Dominei conclui o card.",
                 "Weak",
             )
         )
@@ -195,15 +201,27 @@ class FlashcardsPage(QWidget):
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(16, 16, 16, 16)
         progress = self.progress_service.get_block_progress(self.current_block.id)
-        right_layout.addWidget(label("Sua sessao", "SectionTitle"))
+        queue_info = self.progress_service.get_flashcard_queue(self.current_block.id)
+        due_count = len([item for item in queue_info if item["state"] == "due"])
+        new_count = len([item for item in queue_info if item["state"] == "new"])
+        future_count = len([item for item in queue_info if item["state"] == "future"])
+        current_review = progress.flashcard_reviews.get(card.id, {})
+        right_layout.addWidget(label("Sua sessão", "SectionTitle"))
         right_layout.addWidget(label(f"Fila: {self.queue_position + 1} de {len(self.session_queue)}", "Muted"))
         right_layout.addWidget(label(f"Card real: {self.current_index + 1} de {len(self.cards)}", "Weak"))
         right_layout.addWidget(ProgressLine(int((progress.flashcards_reviewed / max(1, progress.flashcards_total)) * 100)))
+        right_layout.addWidget(label(f"Vencidos: {due_count}", "Muted"))
+        right_layout.addWidget(label(f"Novos: {new_count}", "Muted"))
+        right_layout.addWidget(label(f"Futuros: {future_count}", "Muted"))
+        if isinstance(current_review, dict) and current_review:
+            right_layout.addWidget(label(f"Status atual: {current_review.get('status', 'novo')}", "Weak"))
+            right_layout.addWidget(label(f"Intervalo: {current_review.get('interval_days', 0)} dia(s)", "Weak"))
+            right_layout.addWidget(label(f"Próxima revisão: {self._format_due(current_review.get('due_at'))}", "Weak"))
         right_layout.addWidget(label(f"Revisados: {progress.flashcards_reviewed}", "Muted"))
         right_layout.addWidget(label(f"Repetir: {progress.flashcards_again}", "Muted"))
         right_layout.addWidget(label(f"Bons: {progress.flashcards_good}", "Muted"))
         right_layout.addWidget(label(f"Dominados: {progress.flashcards_mastered}", "Muted"))
-        right_layout.addWidget(label(f"Dificeis: {progress.flashcards_difficult}", "Muted"))
+        right_layout.addWidget(label(f"Difíceis: {progress.flashcards_difficult}", "Muted"))
         right_layout.addStretch()
 
         self.body.addWidget(left)
@@ -222,10 +240,9 @@ class FlashcardsPage(QWidget):
         card = self.cards[self.current_index]
         if status != "skipped":
             self.progress_service.record_flashcard(self.current_block.id, card.id, status)
-        self._schedule_after_rating(status, self.current_index)
         labels = {
             "again": "Repetir",
-            "hard": "Dificil",
+            "hard": "Difícil",
             "good": "Bom",
             "easy": "Dominei",
             "skipped": "Pulou",
@@ -234,17 +251,10 @@ class FlashcardsPage(QWidget):
         log_action("flashcard_marked", block_id=self.current_block.id, flashcard_id=card.id, status=status)
         self._advance()
 
-    def _schedule_after_rating(self, status: str, card_index: int) -> None:
-        future = self.session_queue[self.queue_position + 1 :]
-        self.session_queue = self.session_queue[: self.queue_position + 1] + [
-            item for item in future if item != card_index
-        ]
-        if status == "again":
-            insert_at = min(self.queue_position + 2, len(self.session_queue))
-            self.session_queue.insert(insert_at, card_index)
-        elif status == "hard":
-            insert_at = min(self.queue_position + 4, len(self.session_queue))
-            self.session_queue.insert(insert_at, card_index)
+    def _fresh_queue_indices(self) -> list[int]:
+        if not self.current_block:
+            return []
+        return [int(item["index"]) for item in self.progress_service.get_flashcard_queue(self.current_block.id)]
 
     def _previous(self) -> None:
         if self.session_queue:
@@ -255,12 +265,19 @@ class FlashcardsPage(QWidget):
         self._advance()
 
     def _advance(self) -> None:
+        self.session_queue = self._fresh_queue_indices()
         if self.session_queue:
             if self.queue_position >= len(self.session_queue) - 1:
-                show_toast(self, "Fim da fila de revisao deste bloco.", "info")
+                show_toast(self, "Fim da fila de revisão deste bloco.", "info")
             else:
                 self.queue_position += 1
             self._render_session()
+
+    def _format_due(self, value: object) -> str:
+        text = str(value or "")
+        if not text:
+            return "sem data"
+        return text.split("T", 1)[0]
 
     def _selected_subject(self) -> UISubject | None:
         return next((subject for subject in self.subjects if subject.name == self.subject_combo.currentText()), None)

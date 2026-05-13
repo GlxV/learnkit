@@ -385,6 +385,7 @@ class SQLiteStorage:
                 "questions_answered": row["answered_questions"],
                 "questions_correct": row["correct_answers"],
                 "reviewed_flashcards": json.loads(row["reviewed_flashcards_json"] or "{}"),
+                "flashcard_reviews": json.loads(row["flashcard_reviews_json"] or "{}"),
                 "answered_questions": json.loads(row["answered_questions_json"] or "{}"),
                 "study_time_seconds": row["study_time_seconds"] or 0,
                 "last_accessed_at": row["last_accessed_at"],
@@ -399,10 +400,10 @@ class SQLiteStorage:
                 INSERT INTO study_progress (
                     id, block_id, reviewed_flashcards, answered_questions, correct_answers,
                     total_flashcards, total_questions, progress_percent,
-                    reviewed_flashcards_json, answered_questions_json,
+                    reviewed_flashcards_json, flashcard_reviews_json, answered_questions_json,
                     study_time_seconds, last_accessed_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(block_id) DO UPDATE SET
                     reviewed_flashcards=excluded.reviewed_flashcards,
                     answered_questions=excluded.answered_questions,
@@ -411,6 +412,7 @@ class SQLiteStorage:
                     total_questions=excluded.total_questions,
                     progress_percent=excluded.progress_percent,
                     reviewed_flashcards_json=excluded.reviewed_flashcards_json,
+                    flashcard_reviews_json=excluded.flashcard_reviews_json,
                     answered_questions_json=excluded.answered_questions_json,
                     study_time_seconds=excluded.study_time_seconds,
                     last_accessed_at=excluded.last_accessed_at,
@@ -426,6 +428,7 @@ class SQLiteStorage:
                     progress.questions_total,
                     self._progress_percent(progress),
                     json.dumps(progress.reviewed_flashcards, ensure_ascii=False),
+                    json.dumps(progress.flashcard_reviews, ensure_ascii=False),
                     json.dumps(progress.answered_questions, ensure_ascii=False),
                     progress.study_time_seconds,
                     progress.last_accessed_at,
@@ -433,13 +436,19 @@ class SQLiteStorage:
                 ),
             )
             for flashcard_id, status in progress.reviewed_flashcards.items():
+                review = progress.flashcard_reviews.get(flashcard_id, {})
                 db.execute(
                     """
                     UPDATE flashcards
-                    SET status = ?, times_reviewed = MAX(times_reviewed + 1, 1), last_reviewed_at = ?
+                    SET status = ?, times_reviewed = ?, last_reviewed_at = ?
                     WHERE id = ?
                     """,
-                    (status, progress.updated_at, flashcard_id),
+                    (
+                        status,
+                        int(review.get("times_reviewed", 1)) if isinstance(review, dict) else 1,
+                        str(review.get("last_reviewed_at", progress.updated_at)) if isinstance(review, dict) else progress.updated_at,
+                        flashcard_id,
+                    ),
                 )
             for question_id, answer in progress.answered_questions.items():
                 db.execute(
@@ -585,6 +594,7 @@ class SQLiteStorage:
                     total_questions INTEGER DEFAULT 0,
                     progress_percent INTEGER DEFAULT 0,
                     reviewed_flashcards_json TEXT DEFAULT '{}',
+                    flashcard_reviews_json TEXT DEFAULT '{}',
                     answered_questions_json TEXT DEFAULT '{}',
                     study_time_seconds INTEGER DEFAULT 0,
                     last_accessed_at TEXT,
@@ -592,6 +602,7 @@ class SQLiteStorage:
                 );
                 """
             )
+            self._ensure_column(db, "study_progress", "flashcard_reviews_json", "TEXT DEFAULT '{}'")
 
     def _migrate_json_if_empty(self) -> None:
         if self.database_stats()["subjects"] > 0:
@@ -609,6 +620,11 @@ class SQLiteStorage:
                         self.save_block(subject, module, block)
         except Exception:
             return
+
+    def _ensure_column(self, db: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+        columns = [row["name"] for row in db.execute(f"PRAGMA table_info({table})").fetchall()]
+        if column not in columns:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def _make_unique_slug(self, table: str, parent_id: str | None, name: str) -> str:
         base = slugify(name)
