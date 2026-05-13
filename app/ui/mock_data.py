@@ -57,7 +57,7 @@ def demo_subjects() -> list[UISubject]:
             "Modulos personalizados para provas, trimestres e revisao.",
             62,
             "#3B82F6",
-            "Mx",
+            "calculator",
             [
                 UIModule("1o Trimestre", 61, math_blocks[:5]),
                 UIModule("2o Trimestre", 28, math_blocks[5:]),
@@ -66,11 +66,11 @@ def demo_subjects() -> list[UISubject]:
                 UIModule("Extras", 18, math_blocks[4:]),
             ],
         ),
-        UISubject("Fisica", "Cinematica, dinamica e energia.", 44, "#2563EB", "At", []),
-        UISubject("Quimica", "Estequiometria, ligacoes e solucoes.", 38, "#16A34A", "H2", []),
-        UISubject("Historia", "Linha do tempo, eventos e revisoes.", 57, "#D97706", "III", []),
-        UISubject("Biologia", "Citologia, genetica e ecologia.", 49, "#8B5CF6", "Bio", []),
-        UISubject("Lingua Portuguesa", "Literatura, gramatica e interpretacao.", 53, "#EF4444", "A", []),
+        UISubject("Fisica", "Cinematica, dinamica e energia.", 44, "#2563EB", "atom", []),
+        UISubject("Quimica", "Estequiometria, ligacoes e solucoes.", 38, "#16A34A", "flask", []),
+        UISubject("Historia", "Linha do tempo, eventos e revisoes.", 57, "#D97706", "landmark", []),
+        UISubject("Biologia", "Citologia, genetica e ecologia.", 49, "#8B5CF6", "dna", []),
+        UISubject("Lingua Portuguesa", "Literatura, gramatica e interpretacao.", 53, "#EF4444", "book", []),
     ]
 
 
@@ -142,7 +142,7 @@ class UIDataProvider:
                     description=subject.description or "Organize seus estudos em modulos e blocos personalizados.",
                     progress=subject_percent,
                     color=str(subject.color or meta.get("color", palette[index % len(palette)])),
-                    icon=str(subject.icon or meta.get("icon", subject.name[:2].upper())),
+                    icon=str(subject.icon or meta.get("icon", "book")),
                     modules=modules,
                     id=subject.id,
                     slug=subject.slug,
@@ -172,7 +172,7 @@ class UIDataProvider:
             metadata = self._load_metadata()
             metadata[subject.slug] = {
                 "color": color or "#3B82F6",
-                "icon": icon or name[:2].upper(),
+                "icon": icon or "book",
             }
             self._save_metadata(metadata)
         module_service = ModuleService(self.storage)

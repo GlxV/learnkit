@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+import re
+
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QCheckBox,
+    QColorDialog,
     QDialog,
     QFrame,
     QGridLayout,
@@ -21,12 +26,56 @@ from PySide6.QtWidgets import (
 from app.core.services.block_service import BlockService
 from app.core.services.module_service import ModuleService
 from app.ui.feedback import confirm_action, log_action, show_toast
-from app.ui.icon_catalog import MODULE_PRESETS, SUBJECT_ICONS
+from app.ui.icon_catalog import MODULE_PRESETS, SUBJECT_ICON_LABELS, SUBJECT_ICONS
 from app.ui.components.cards import EmptyState, ProgressLine, StatCard, StudyBlockRow, SubjectCard, label
+from app.ui.components.icons import LineIcon
 from app.ui.components.visual import IconBadge
 from app.ui.mock_data import UIDataProvider, UIModule, UISubject
 from app.ui.pages.base import panel, scroll_page
 from app.ui.theme import COLORS
+
+
+class IconChoiceButton(QPushButton):
+    def __init__(self, icon_name: str, accent_color: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.icon_name = icon_name
+        self.setCheckable(True)
+        self.setFixedSize(56, 42)
+        self.setIconSize(QSize(22, 22))
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(SUBJECT_ICON_LABELS.get(icon_name, icon_name.replace("-", " ").title()))
+        self.set_active(False, accent_color)
+
+    def set_active(self, active: bool, accent_color: str) -> None:
+        self.setChecked(active)
+        self.setIcon(self._icon("#FFFFFF" if active else COLORS["muted"]))
+        background = "rgba(124, 58, 237, 0.30)" if active else "#07111F"
+        border = accent_color if active else COLORS["border"]
+        self.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: {background};
+                border: 1px solid {border};
+                border-radius: 11px;
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background: #101B31;
+                border-color: {accent_color};
+            }}
+            QPushButton:pressed {{
+                background: #0B1424;
+            }}
+            """
+        )
+
+    def _icon(self, color: str) -> QIcon:
+        size = 22
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        icon = LineIcon(self.icon_name, color, size)
+        icon.render(pixmap)
+        return QIcon(pixmap)
 
 
 class NewSubjectDialog(QDialog):
@@ -37,17 +86,34 @@ class NewSubjectDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("NewSubjectDialog")
-        self.setWindowTitle("Nova materia personalizada")
+        self.setWindowTitle("Nova matéria personalizada")
         self.setModal(True)
-        self.resize(720, 760)
+        screen = QApplication.primaryScreen()
+        available_height = screen.availableGeometry().height() if screen else 760
+        safe_height = max(540, min(760, available_height - 72))
+        self.resize(720, safe_height)
+        self.setMinimumSize(620, 500)
+        self.setMaximumHeight(max(520, available_height - 36))
         self.selected_color = self.COLORS[0]
         self.selected_icon = self.ICONS[0]
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 26, 28, 24)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(28, 26, 28, 18)
         layout.setSpacing(14)
-        layout.addWidget(label("Nova materia personalizada", "Title"))
-        layout.addWidget(label("Crie uma area local de estudo com cor, simbolo e modulos iniciais.", "Muted"))
+        scroll.setWidget(content)
+        root.addWidget(scroll, 1)
+
+        layout.addWidget(label("Nova matéria personalizada", "Title"))
+        layout.addWidget(label("Crie uma área local de estudo com cor, ícone e módulos iniciais.", "Muted"))
 
         preview = panel()
         preview_layout = QHBoxLayout(preview)
@@ -55,8 +121,8 @@ class NewSubjectDialog(QDialog):
         preview_layout.setSpacing(14)
         self.preview_icon = IconBadge(self.selected_icon, self.selected_color, size=54, radius=14)
         preview_text = QVBoxLayout()
-        self.preview_name = label("Nome da materia", "SectionTitle")
-        self.preview_description = label("Descricao curta da materia.", "Muted")
+        self.preview_name = label("Nome da matéria", "SectionTitle")
+        self.preview_description = label("Descrição curta da matéria.", "Muted")
         preview_text.addWidget(self.preview_name)
         preview_text.addWidget(self.preview_description)
         preview_layout.addWidget(self.preview_icon)
@@ -68,14 +134,32 @@ class NewSubjectDialog(QDialog):
         self.name.textChanged.connect(self._refresh_preview)
         self.description = QTextEdit()
         self.description.setFixedHeight(82)
-        self.description.setPlaceholderText("Ex: SQL, modelo relacional e normalizacao.")
+        self.description.setPlaceholderText("Ex: SQL, modelo relacional e normalização.")
         self.description.textChanged.connect(self._refresh_preview)
-        layout.addWidget(label("Nome da materia", "SmallTitle"))
+        layout.addWidget(label("Nome da matéria", "SmallTitle"))
         layout.addWidget(self.name)
-        layout.addWidget(label("Descricao opcional", "SmallTitle"))
+        layout.addWidget(label("Descrição opcional", "SmallTitle"))
         layout.addWidget(self.description)
 
         layout.addWidget(label("Cor de destaque", "SmallTitle"))
+        color_picker_row = QHBoxLayout()
+        self.color_preview = QPushButton()
+        self.color_preview.setFixedSize(42, 42)
+        self.color_preview.clicked.connect(self._choose_color)
+        self.hex_color = QLineEdit(self.selected_color)
+        self.hex_color.setPlaceholderText("#3B82F6")
+        self.hex_color.setMaxLength(7)
+        self.hex_color.editingFinished.connect(self._apply_hex_color_from_input)
+        choose_color = QPushButton("Escolher cor")
+        choose_color.clicked.connect(self._choose_color)
+        color_picker_row.addWidget(self.color_preview)
+        color_picker_row.addWidget(self.hex_color, 1)
+        color_picker_row.addWidget(choose_color)
+        layout.addLayout(color_picker_row)
+        self.color_help = label("Digite um HEX ou escolha no seletor visual.", "Weak")
+        layout.addWidget(self.color_help)
+
+        quick_colors = QHBoxLayout()
         color_row = QHBoxLayout()
         self.color_buttons: list[QPushButton] = []
         for color in self.COLORS:
@@ -88,18 +172,20 @@ class NewSubjectDialog(QDialog):
             )
             button.clicked.connect(lambda checked=False, value=color: self._set_color(value))
             self.color_buttons.append(button)
-            color_row.addWidget(button)
+            quick_colors.addWidget(button)
         self.color_buttons[0].setChecked(True)
-        color_row.addStretch()
+        quick_colors.addStretch()
+        color_row.addWidget(label("Sugestões", "Weak"))
+        color_row.addLayout(quick_colors, 1)
         layout.addLayout(color_row)
 
         icon_header = QHBoxLayout()
-        icon_header.addWidget(label("Simbolo", "SmallTitle"))
+        icon_header.addWidget(label("Icone", "SmallTitle"))
         icon_header.addStretch()
-        icon_header.addWidget(label("100 opcoes prontas", "Weak"))
+        icon_header.addWidget(label("100 icones prontos", "Weak"))
         layout.addLayout(icon_header)
         icon_scroll = QScrollArea()
-        icon_scroll.setFixedHeight(168)
+        icon_scroll.setFixedHeight(176)
         icon_scroll.setWidgetResizable(True)
         icon_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         icon_container = QWidget()
@@ -109,28 +195,27 @@ class NewSubjectDialog(QDialog):
         icon_grid.setVerticalSpacing(8)
         self.icon_group = QButtonGroup(self)
         self.icon_group.setExclusive(True)
+        self.icon_buttons: list[IconChoiceButton] = []
         for index, icon in enumerate(self.ICONS):
-            button = QPushButton(icon)
-            button.setCheckable(True)
-            button.setObjectName("GhostButton")
-            button.setFixedHeight(38)
+            button = IconChoiceButton(icon, self.selected_color)
             button.clicked.connect(lambda checked=False, value=icon: self._set_icon(value))
             self.icon_group.addButton(button)
+            self.icon_buttons.append(button)
             icon_grid.addWidget(button, index // 6, index % 6)
             if index == 0:
-                button.setChecked(True)
+                button.set_active(True, self.selected_color)
         icon_scroll.setWidget(icon_container)
         layout.addWidget(icon_scroll)
 
         module_header = QHBoxLayout()
-        module_header.addWidget(label("Modulos iniciais", "SmallTitle"))
+        module_header.addWidget(label("Módulos iniciais", "SmallTitle"))
         module_header.addStretch()
         module_header.addWidget(label("Escolha presets ou escreva os seus", "Weak"))
         layout.addLayout(module_header)
         custom_row = QHBoxLayout()
         self.custom_module = QLineEdit()
-        self.custom_module.setPlaceholderText("Ex: Prova 5, 4o Bimestre, Unidade 7")
-        add_module = QPushButton("Adicionar modulo")
+        self.custom_module.setPlaceholderText("Ex: Prova 5, 4º Bimestre, Unidade 7")
+        add_module = QPushButton("Adicionar módulo")
         add_module.clicked.connect(self._add_custom_module)
         self.custom_module.returnPressed.connect(self._add_custom_module)
         custom_row.addWidget(self.custom_module, 1)
@@ -153,15 +238,17 @@ class NewSubjectDialog(QDialog):
         layout.addWidget(module_scroll)
 
         actions = QHBoxLayout()
+        actions.setContentsMargins(28, 14, 28, 22)
         actions.addStretch()
         cancel = QPushButton("Cancelar")
-        create = QPushButton("Criar materia")
+        create = QPushButton("Criar matéria")
         create.setObjectName("PrimaryButton")
         cancel.clicked.connect(self.reject)
         create.clicked.connect(self.accept)
         actions.addWidget(cancel)
         actions.addWidget(create)
-        layout.addLayout(actions)
+        root.addLayout(actions)
+        self._refresh_color_controls()
 
     def selected_modules(self) -> list[str]:
         modules: list[str] = []
@@ -172,6 +259,11 @@ class NewSubjectDialog(QDialog):
                 modules.append(value)
                 seen.add(value.casefold())
         return modules
+
+    def accept(self) -> None:  # type: ignore[override]
+        if not self._apply_hex_color_from_input(show_error=True):
+            return
+        super().accept()
 
     def _add_module_check(self, module: str, checked: bool = True) -> None:
         if not module.strip():
@@ -192,25 +284,85 @@ class NewSubjectDialog(QDialog):
         self.custom_module.clear()
 
     def _set_color(self, color: str) -> None:
-        self.selected_color = color
-        for button, item_color in zip(self.color_buttons, self.COLORS):
-            button.setChecked(item_color == color)
+        normalized = self._normalized_hex(color)
+        if normalized is None:
+            return
+        self.selected_color = normalized
+        self._refresh_color_controls()
+        self._refresh_icon_buttons()
         self._refresh_preview()
+
+    def _choose_color(self) -> None:
+        dialog = QColorDialog(QColor(self.selected_color), self)
+        dialog.setWindowTitle("Escolher cor de destaque")
+        dialog.setOption(QColorDialog.ColorDialogOption.DontUseNativeDialog, True)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            color = dialog.selectedColor()
+            if color.isValid():
+                self._set_color(color.name().upper())
+
+    def _apply_hex_color_from_input(self, show_error: bool = False) -> bool:
+        value = self.hex_color.text().strip()
+        normalized = self._normalized_hex(value)
+        if normalized is None:
+            self.hex_color.setStyleSheet(f"border-color: {COLORS['red']};")
+            self.color_help.setText("Use um HEX valido, por exemplo #3B82F6.")
+            self.color_help.setStyleSheet(f"color: {COLORS['red']}; font-size: 12px;")
+            if show_error:
+                show_toast(self, "Informe uma cor HEX valida.", "warning")
+            return False
+        self.selected_color = normalized
+        self._refresh_color_controls()
+        self._refresh_icon_buttons()
+        self._refresh_preview()
+        return True
+
+    def _normalized_hex(self, value: str) -> str | None:
+        raw = value.strip()
+        if raw and not raw.startswith("#"):
+            raw = f"#{raw}"
+        if re.fullmatch(r"#[0-9A-Fa-f]{6}", raw):
+            return raw.upper()
+        return None
+
+    def _refresh_color_controls(self) -> None:
+        self.hex_color.blockSignals(True)
+        self.hex_color.setText(self.selected_color)
+        self.hex_color.blockSignals(False)
+        self.hex_color.setStyleSheet("")
+        self.color_help.setText("Digite um HEX ou escolha no seletor visual.")
+        self.color_help.setStyleSheet(f"color: {COLORS['weak']}; font-size: 12px;")
+        self.color_preview.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: {self.selected_color};
+                border-radius: 12px;
+                border: 2px solid rgba(255, 255, 255, 0.74);
+            }}
+            QPushButton:hover {{
+                border-color: white;
+            }}
+            """
+        )
+        for button, item_color in zip(self.color_buttons, self.COLORS):
+            button.setChecked(item_color.upper() == self.selected_color)
 
     def _set_icon(self, icon: str) -> None:
         self.selected_icon = icon
+        self._refresh_icon_buttons()
         self._refresh_preview()
 
+    def _refresh_icon_buttons(self) -> None:
+        for button in self.icon_buttons:
+            button.set_active(button.icon_name == self.selected_icon, self.selected_color)
+
     def _refresh_preview(self) -> None:
-        name = self.name.text().strip() or "Nome da materia"
-        description = self.description.toPlainText().strip() or "Descricao curta da materia."
+        name = self.name.text().strip() or "Nome da matéria"
+        description = self.description.toPlainText().strip() or "Descrição curta da matéria."
         self.preview_name.setText(name)
         self.preview_description.setText(description)
         self.preview_icon.setText(self.selected_icon)
-        self.preview_icon.setStyleSheet(
-            f"background: {self.selected_color}; border-radius: 14px; color: white; "
-            "font-size: 17px; font-weight: 850;"
-        )
+        self.preview_icon.set_color(self.selected_color)
 
 
 class NewModuleDialog(QDialog):
@@ -400,7 +552,7 @@ class SubjectsPage(QWidget):
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(10)
         header = QHBoxLayout()
-        header.addWidget(IconBadge("M", self.selected_subject.color if self.selected_subject else COLORS["purple"], size=38, radius=10))
+        header.addWidget(IconBadge("blocks", self.selected_subject.color if self.selected_subject else COLORS["purple"], size=38, radius=10))
         title_box = QVBoxLayout()
         title_box.addWidget(label(module.name, "SmallTitle"))
         title_box.addWidget(label(f"{len(module.blocks)} blocos", "Weak"))

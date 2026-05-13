@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QFrame, QGraphicsDropShadowEffect, QLabel, QWidget
+from PySide6.QtWidgets import QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QWidget
 
+from app.ui.components.icons import LineIcon, supports_line_icon
 from app.ui.theme import COLORS
 
 
@@ -15,7 +16,7 @@ def add_shadow(widget: QWidget, blur: int = 28, y_offset: int = 10, alpha: int =
     widget.setGraphicsEffect(shadow)
 
 
-class IconBadge(QLabel):
+class IconBadge(QFrame):
     def __init__(
         self,
         text: str,
@@ -24,17 +25,59 @@ class IconBadge(QLabel):
         radius: int = 14,
         font_size: int = 17,
     ) -> None:
-        super().__init__(text)
+        super().__init__()
+        self._value = text
+        self._color = color
+        self._size = size
+        self._radius = radius
+        self._font_size = font_size
         self.setFixedSize(size, size)
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet(
+        self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._content: QWidget | None = None
+        self._apply_frame_style()
+        self.setText(text)
+
+    def setText(self, text: str) -> None:
+        self._value = text
+        while self._layout.count():
+            item = self._layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._content = None
+
+        if supports_line_icon(text):
+            icon = LineIcon(text, "#FFFFFF", max(18, int(self._size * 0.54)))
+            icon.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            self._content = icon
+        else:
+            fallback = QLabel(text)
+            fallback.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            fallback.setStyleSheet(
+                f"background: transparent; color: white; "
+                f"font-size: {self._font_size}px; font-weight: 850;"
+            )
+            self._content = fallback
+        self._layout.addWidget(self._content)
+
+    def text(self) -> str:
+        return self._value
+
+    def set_color(self, color: str) -> None:
+        self._color = color
+        self._apply_frame_style()
+
+    def setStyleSheet(self, style_sheet: str) -> None:  # type: ignore[override]
+        super().setStyleSheet(style_sheet)
+
+    def _apply_frame_style(self) -> None:
+        super().setStyleSheet(
             f"""
-            QLabel {{
-                background: {color};
-                border-radius: {radius}px;
-                color: white;
-                font-size: {font_size}px;
-                font-weight: 850;
+            QFrame {{
+                background: {self._color};
+                border-radius: {self._radius}px;
+                border: 1px solid rgba(255, 255, 255, 0.16);
             }}
             """
         )
