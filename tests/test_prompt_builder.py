@@ -22,7 +22,8 @@ def test_build_prompt_includes_structure_options_and_extracted_content() -> None
         options=options,
     )
 
-    assert "# RESUMO" in prompt
+    assert "# RESUMO_TEXTO" in prompt
+    assert "# RESUMO_VISUAL" in prompt
     assert "## Visao geral" in prompt
     assert "# FLASHCARDS" in prompt
     assert "# PERGUNTAS" in prompt

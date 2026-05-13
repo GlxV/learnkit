@@ -60,6 +60,63 @@ def test_parser_returns_warnings_for_missing_sections() -> None:
     assert "Nenhuma secao PERGUNTAS encontrada." in parsed.warnings
 
 
+def test_parser_accepts_text_and_visual_summary_sections() -> None:
+    response = """# RESUMO_TEXTO
+
+Resumo em Markdown.
+
+# RESUMO_VISUAL
+{
+  "title": "Modelo Relacional",
+  "sections": [
+    {"type": "hero", "title": "Chaves", "text": "Identificam registros."}
+  ]
+}
+
+# FLASHCARDS
+
+## Card 1
+Pergunta: O que e uma chave primaria?
+Resposta: Identificador unico.
+
+# PERGUNTAS
+
+## Pergunta 1
+Enunciado: Qual opcao define chave primaria?
+A) Identificador unico
+B) Backup
+C) Grafico
+D) Arquivo
+Gabarito: A
+Explicacao: Identifica registros.
+"""
+
+    parsed = AIResponseParser().parse(response)
+
+    assert parsed.summary.content == "Resumo em Markdown."
+    assert '"title": "Modelo Relacional"' in parsed.summary_visual
+    assert parsed.ai_response.parsed_successfully is True
+
+
+def test_parser_warns_and_ignores_invalid_visual_summary() -> None:
+    response = """# RESUMO_TEXTO
+
+Resumo.
+
+# RESUMO_VISUAL
+{invalid
+
+# FLASHCARDS
+
+# PERGUNTAS
+"""
+
+    parsed = AIResponseParser().parse(response)
+
+    assert parsed.summary_visual == ""
+    assert "RESUMO_VISUAL possui JSON invalido." in parsed.warnings
+
+
 def test_parser_accepts_looser_markdown_variations() -> None:
     response = """# Resumo
 

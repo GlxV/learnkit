@@ -319,6 +319,8 @@ class ImportPage(QWidget):
         self.difficulty_combo.addItems(["facil", "medio", "dificil"])
         self.language_combo = QComboBox()
         self.language_combo.addItems(["simples", "academica", "direta para prova"])
+        self.summary_mode_combo = QComboBox()
+        self.summary_mode_combo.addItems(["texto e visual", "somente texto", "visual avancado"])
         options_layout.addWidget(label("Flashcards", "Weak"))
         options_layout.addWidget(self.flashcard_count)
         options_layout.addWidget(label("Perguntas", "Weak"))
@@ -326,7 +328,9 @@ class ImportPage(QWidget):
         options_layout.addWidget(label("Dificuldade", "Weak"))
         options_layout.addWidget(self.difficulty_combo)
         options_layout.addWidget(label("Linguagem", "Weak"))
-        options_layout.addWidget(self.language_combo, 1)
+        options_layout.addWidget(self.language_combo)
+        options_layout.addWidget(label("Resumo", "Weak"))
+        options_layout.addWidget(self.summary_mode_combo, 1)
         self.options_panel.setVisible(False)
         layout.addWidget(self.options_panel)
 
@@ -671,6 +675,7 @@ class ImportPage(QWidget):
             question_count=int(self.question_count.value()),
             difficulty=self.difficulty_combo.currentText(),
             language_style=self.language_combo.currentText(),
+            summary_mode=self.summary_mode_combo.currentText(),
         )
         subject = self.subject_combo.currentText().strip() or "Materia a definir"
         module = self.module_combo.currentText().strip() or "Modulo a definir"
@@ -712,7 +717,8 @@ class ImportPage(QWidget):
             return
         parsed = self.parser.parse(raw)
         has_summary = bool(parsed.summary.content.strip())
-        has_content = has_summary or bool(parsed.flashcards) or bool(parsed.questions)
+        has_visual = bool(parsed.summary_visual.strip())
+        has_content = has_summary or has_visual or bool(parsed.flashcards) or bool(parsed.questions)
         if not has_content:
             self.parsed_response = None
             self.save_button.setEnabled(False)
@@ -724,7 +730,8 @@ class ImportPage(QWidget):
 
         self.parsed_response = parsed
         self.response_status.setText(
-            f"Resumo: {'sim' if has_summary else 'nao'} - "
+            f"Resumo texto: {'sim' if has_summary else 'nao'} - "
+            f"Resumo visual: {'sim' if has_visual else 'nao'} - "
             f"{len(parsed.flashcards)} flashcards - {len(parsed.questions)} perguntas - "
             f"{len(parsed.warnings)} avisos"
         )

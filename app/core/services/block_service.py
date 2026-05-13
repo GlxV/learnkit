@@ -132,6 +132,8 @@ class BlockService:
         block.ai_response_raw = response_text
         block.ai_response = parsed.ai_response
         block.summary = parsed.summary
+        block.summary_visual = parsed.summary_visual
+        block.preferred_summary_mode = "visual" if parsed.summary_visual else "text"
         block.flashcards = parsed.flashcards
         block.questions = parsed.questions
         block.touch()
@@ -171,6 +173,8 @@ class BlockService:
         block.summary = (
             parsed_response.summary if parsed_response.summary.content.strip() else None
         )
+        block.summary_visual = parsed_response.summary_visual
+        block.preferred_summary_mode = "visual" if parsed_response.summary_visual else "text"
         block.flashcards = parsed_response.flashcards
         block.questions = parsed_response.questions
         block.touch()

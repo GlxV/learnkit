@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QGridLayout,
     QHBoxLayout,
     QMessageBox,
     QPushButton,
+    QStackedWidget,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
@@ -15,6 +17,7 @@ from PySide6.QtWidgets import (
 from app.core.services.progress_service import ProgressService
 from app.core.storage.local_storage import LocalStorage
 from app.ui.components.cards import EmptyState, ProgressLine, StatCard, StudyBlockRow, label
+from app.ui.components.summary_visual import PresentationDialog, VisualSummaryWidget
 from app.ui.feedback import log_action, show_toast
 from app.ui.mock_data import UIBlock, UIDataProvider, UIModule, UISubject
 from app.ui.pages.base import panel, scroll_page
@@ -22,21 +25,87 @@ from app.ui.theme import COLORS
 
 
 class SummaryDialog(QDialog):
-    def __init__(self, title: str, markdown: str, parent: QWidget | None = None) -> None:
+    def __init__(self, storage: LocalStorage, block_id: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f"Resumo - {title}")
-        self.resize(760, 620)
+        self.storage = storage
+        self.subject, self.module, self.block = self.storage.get_block_by_id(block_id)
+        self.setWindowTitle(f"Resumo - {self.block.title}")
+        self.resize(980, 720)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 22, 22, 22)
         layout.setSpacing(14)
-        layout.addWidget(label(title, "Title"))
-        viewer = QTextBrowser()
-        viewer.setOpenExternalLinks(False)
-        viewer.setMarkdown(markdown or "Este bloco ainda nao possui resumo importado.")
-        layout.addWidget(viewer, 1)
+
+        header = QHBoxLayout()
+        title_box = QVBoxLayout()
+        title = label(self.block.title, "Title")
+        subtitle = label(f"{self.subject.name} > {self.module.name}", "Muted")
+        title_box.addWidget(title)
+        title_box.addWidget(subtitle)
+        header.addLayout(title_box, 1)
+
+        self.text_button = QPushButton("Texto")
+        self.text_button.setCheckable(True)
+        self.text_button.clicked.connect(lambda: self._set_mode("text"))
+        self.visual_button = QPushButton("Visual")
+        self.visual_button.setCheckable(True)
+        self.visual_button.clicked.connect(lambda: self._set_mode("visual"))
+        copy = QPushButton("Copiar")
+        copy.clicked.connect(self._copy_current)
+        edit = QPushButton("Editar")
+        edit.setEnabled(False)
+        edit.setToolTip("Editor de resumo fica para uma versão futura.")
+        self.presentation = QPushButton("Modo apresentação")
+        self.presentation.clicked.connect(self._open_presentation)
+        self.presentation.setEnabled(bool(self.block.summary_visual.strip()))
+        self.presentation.setToolTip("" if self.presentation.isEnabled() else "Disponível quando houver resumo visual.")
+        for widget in [self.text_button, self.visual_button, copy, edit, self.presentation]:
+            header.addWidget(widget)
+        layout.addLayout(header)
+
+        self.stack = QStackedWidget()
+        self.text_viewer = QTextBrowser()
+        self.text_viewer.setOpenExternalLinks(False)
+        markdown = self.block.summary.content if self.block.summary else ""
+        self.text_viewer.setMarkdown(markdown or "Este bloco ainda não possui resumo importado.")
+        self.visual_viewer = VisualSummaryWidget(self.block.summary_visual)
+        self.stack.addWidget(self.text_viewer)
+        self.stack.addWidget(self.visual_viewer)
+        layout.addWidget(self.stack, 1)
+
         close = QPushButton("Fechar")
         close.clicked.connect(self.accept)
         layout.addWidget(close)
+        preferred = self.block.preferred_summary_mode if self.block.summary_visual else "text"
+        self._set_mode(preferred, save=False)
+
+    def _set_mode(self, mode: str, save: bool = True) -> None:
+        normalized = "visual" if mode == "visual" and self.block.summary_visual else "text"
+        self.stack.setCurrentIndex(1 if normalized == "visual" else 0)
+        self.text_button.setChecked(normalized == "text")
+        self.visual_button.setChecked(normalized == "visual")
+        self.presentation.setVisible(normalized == "visual")
+        if save:
+            subject, module, block = self.storage.get_block_by_id(self.block.id)
+            block.preferred_summary_mode = normalized
+            block.touch()
+            self.storage.save_block(subject, module, block)
+            self.block = block
+
+    def _copy_current(self) -> None:
+        if self.stack.currentWidget() is self.visual_viewer:
+            text = self.block.summary_visual
+        else:
+            text = self.block.summary.content if self.block.summary else ""
+        QApplication.clipboard().setText(text)
+        show_toast(self, "Resumo copiado.", "success")
+
+    def _open_presentation(self) -> None:
+        if not self.block.summary_visual:
+            show_toast(self, "Este bloco ainda não possui resumo visual.", "warning")
+            return
+        dialog = PresentationDialog(self.block.title, self.block.summary_visual, self)
+        dialog.showMaximized()
+        dialog.exec()
 
 
 class StudiesPage(QWidget):
@@ -229,7 +298,7 @@ class StudiesPage(QWidget):
             return
         _, _, stored_block = self.storage.get_block_by_id(block.id)
         show_toast(self, f"Abrindo resumo: {stored_block.title}", "info")
-        SummaryDialog(stored_block.title, stored_block.summary.content if stored_block.summary else "", self).exec()
+        SummaryDialog(self.storage, stored_block.id, self).exec()
 
     def _selected_subject(self) -> UISubject | None:
         if self.subject_combo is None:
