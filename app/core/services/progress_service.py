@@ -108,14 +108,51 @@ class ProgressService:
         selected = selected_answer.strip().upper()
         correct = correct_answer.strip().upper()
         progress = self.get_block_progress(block_id)
-        progress.answered_questions[question_id] = {
+        attempt = {
             "selected_answer": selected,
             "correct_answer": correct,
             "is_correct": selected == correct,
             "answered_at": utc_now(),
         }
+        progress.answered_questions[question_id] = attempt
+        progress.question_attempts.setdefault(question_id, []).append(attempt)
         progress.last_accessed_at = utc_now()
         return self.save_block_progress(block_id, progress)
+
+    def get_question_queue(self, block_id: str, filter_mode: str = "all") -> list[dict[str, Any]]:
+        _, _, block = self.storage.get_block_by_id(block_id)
+        progress = self.get_block_progress(block_id)
+        valid_filters = {"all", "unanswered", "wrong", "correct"}
+        selected_filter = filter_mode if filter_mode in valid_filters else "all"
+        queue: list[dict[str, Any]] = []
+        order = {"unanswered": 0, "wrong": 1, "correct": 2}
+        for index, question in enumerate(block.questions):
+            answer = progress.answered_questions.get(question.id)
+            if not answer:
+                state = "unanswered"
+            elif answer.get("is_correct"):
+                state = "correct"
+            else:
+                state = "wrong"
+            if selected_filter != "all" and state != selected_filter:
+                continue
+            attempts = progress.question_attempts.get(question.id, [])
+            queue.append(
+                {
+                    "question_id": question.id,
+                    "index": index,
+                    "state": state,
+                    "selected_answer": answer.get("selected_answer") if answer else "",
+                    "correct_answer": question.correct_answer,
+                    "attempts": len(attempts),
+                    "last_answered_at": answer.get("answered_at") if answer else "",
+                    "_sort": (order[state], index),
+                }
+            )
+        queue.sort(key=lambda item: item["_sort"])
+        for item in queue:
+            item.pop("_sort", None)
+        return queue
 
     def get_global_stats(self) -> AggregateProgress:
         subjects = self.storage.list_subjects()

@@ -53,6 +53,7 @@ O progresso é persistido no banco. O app salva:
 - perguntas respondidas;
 - alternativa escolhida;
 - se a resposta estava correta;
+- histórico de tentativas das perguntas;
 - último acesso;
 - porcentagem agregada por bloco, módulo, matéria e global.
 
@@ -66,6 +67,15 @@ Os flashcards usam um agendamento simples inspirado no Anki, sem limite diário:
 - `Dominei`: aumenta mais o intervalo e a facilidade.
 
 A fila mostra cards vencidos primeiro, cards novos depois e cards futuros por último.
+
+Nas perguntas, o LearnKit mantém a resposta mais recente para calcular progresso, mas também guarda o histórico de tentativas. A aba `Perguntas` permite filtrar por:
+
+- todas;
+- não respondidas;
+- erradas;
+- corretas.
+
+Isso permite revisar erros sem apagar o histórico anterior.
 
 ## Resumo Texto e Visual
 

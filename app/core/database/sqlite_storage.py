@@ -387,6 +387,7 @@ class SQLiteStorage:
                 "reviewed_flashcards": json.loads(row["reviewed_flashcards_json"] or "{}"),
                 "flashcard_reviews": json.loads(row["flashcard_reviews_json"] or "{}"),
                 "answered_questions": json.loads(row["answered_questions_json"] or "{}"),
+                "question_attempts": json.loads(row["question_attempts_json"] or "{}"),
                 "study_time_seconds": row["study_time_seconds"] or 0,
                 "last_accessed_at": row["last_accessed_at"],
                 "updated_at": row["updated_at"],
@@ -401,9 +402,10 @@ class SQLiteStorage:
                     id, block_id, reviewed_flashcards, answered_questions, correct_answers,
                     total_flashcards, total_questions, progress_percent,
                     reviewed_flashcards_json, flashcard_reviews_json, answered_questions_json,
+                    question_attempts_json,
                     study_time_seconds, last_accessed_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(block_id) DO UPDATE SET
                     reviewed_flashcards=excluded.reviewed_flashcards,
                     answered_questions=excluded.answered_questions,
@@ -414,6 +416,7 @@ class SQLiteStorage:
                     reviewed_flashcards_json=excluded.reviewed_flashcards_json,
                     flashcard_reviews_json=excluded.flashcard_reviews_json,
                     answered_questions_json=excluded.answered_questions_json,
+                    question_attempts_json=excluded.question_attempts_json,
                     study_time_seconds=excluded.study_time_seconds,
                     last_accessed_at=excluded.last_accessed_at,
                     updated_at=excluded.updated_at
@@ -430,6 +433,7 @@ class SQLiteStorage:
                     json.dumps(progress.reviewed_flashcards, ensure_ascii=False),
                     json.dumps(progress.flashcard_reviews, ensure_ascii=False),
                     json.dumps(progress.answered_questions, ensure_ascii=False),
+                    json.dumps(progress.question_attempts, ensure_ascii=False),
                     progress.study_time_seconds,
                     progress.last_accessed_at,
                     progress.updated_at,
@@ -596,6 +600,7 @@ class SQLiteStorage:
                     reviewed_flashcards_json TEXT DEFAULT '{}',
                     flashcard_reviews_json TEXT DEFAULT '{}',
                     answered_questions_json TEXT DEFAULT '{}',
+                    question_attempts_json TEXT DEFAULT '{}',
                     study_time_seconds INTEGER DEFAULT 0,
                     last_accessed_at TEXT,
                     updated_at TEXT NOT NULL
@@ -603,6 +608,7 @@ class SQLiteStorage:
                 """
             )
             self._ensure_column(db, "study_progress", "flashcard_reviews_json", "TEXT DEFAULT '{}'")
+            self._ensure_column(db, "study_progress", "question_attempts_json", "TEXT DEFAULT '{}'")
 
     def _migrate_json_if_empty(self) -> None:
         if self.database_stats()["subjects"] > 0:

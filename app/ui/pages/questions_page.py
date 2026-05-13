@@ -22,6 +22,7 @@ class QuestionsPage(QWidget):
         self.subjects = provider.subjects()
         self.current_block: StudyBlock | None = None
         self.questions: list[Question] = []
+        self.question_queue: list[dict[str, object]] = []
         self.current_index = 0
         self.selected_answer: str | None = None
         self.answered = False
@@ -38,6 +39,7 @@ class QuestionsPage(QWidget):
         self.subjects = self.provider.subjects()
         self.current_block = None
         self.questions = []
+        self.question_queue = []
         self.current_index = 0
         self.selected_answer = None
         self.answered = False
@@ -60,12 +62,19 @@ class QuestionsPage(QWidget):
         self.subject_combo.addItems([subject.name for subject in self.subjects])
         self.module_combo = QComboBox()
         self.block_combo = QComboBox()
+        self.filter_combo = QComboBox()
+        self.filter_combo.addItem("Todas", "all")
+        self.filter_combo.addItem("Não respondidas", "unanswered")
+        self.filter_combo.addItem("Erradas", "wrong")
+        self.filter_combo.addItem("Corretas", "correct")
         self.subject_combo.currentTextChanged.connect(self._refresh_modules)
         self.module_combo.currentTextChanged.connect(self._refresh_blocks)
         self.block_combo.currentTextChanged.connect(self._load_selected_block)
+        self.filter_combo.currentTextChanged.connect(self._load_selected_block)
         filters.addWidget(self.subject_combo)
         filters.addWidget(self.module_combo)
         filters.addWidget(self.block_combo, 1)
+        filters.addWidget(self.filter_combo)
         filters.addStretch()
         self.layout.addLayout(filters)
 
@@ -123,6 +132,7 @@ class QuestionsPage(QWidget):
         _, _, block = self.storage.get_block_by_id(block_id)
         self.current_block = block
         self.questions = block.questions
+        self.question_queue = self._fresh_question_queue()
         self.current_index = 0
         self.selected_answer = None
         self.answered = False
@@ -144,6 +154,17 @@ class QuestionsPage(QWidget):
                 )
             )
             return
+        self.question_queue = self._fresh_question_queue()
+        if self.current_index >= len(self.question_queue):
+            self.current_index = max(0, len(self.question_queue) - 1)
+        if not self.question_queue:
+            self.body.addWidget(
+                EmptyState(
+                    "Nenhuma pergunta neste filtro.",
+                    "Troque o filtro ou responda novas perguntas para mudar esta lista.",
+                )
+            )
+            return
 
         left = panel()
         left.setFixedWidth(290)
@@ -159,12 +180,23 @@ class QuestionsPage(QWidget):
         left_layout.addStretch()
 
         center = QVBoxLayout()
-        question = self.questions[self.current_index]
+        progress = self.progress_service.get_block_progress(self.current_block.id)
+        queue_item = self.question_queue[self.current_index]
+        question = self.questions[int(queue_item["index"])]
+        latest_answer = progress.answered_questions.get(question.id, {})
+        attempts = progress.question_attempts.get(question.id, [])
+        display_answer = self.selected_answer or str(latest_answer.get("selected_answer", "") or "")
+        show_result = self.answered or bool(latest_answer)
         qcard = panel()
         qlayout = QVBoxLayout(qcard)
         qlayout.setContentsMargins(24, 22, 24, 22)
         qlayout.setSpacing(14)
-        qlayout.addWidget(label(f"Questão {self.current_index + 1} de {len(self.questions)}", "Weak"))
+        state_label = {
+            "unanswered": "não respondida",
+            "wrong": "errada",
+            "correct": "correta",
+        }.get(str(queue_item["state"]), "pergunta")
+        qlayout.addWidget(label(f"Questão {self.current_index + 1} de {len(self.question_queue)} • {state_label}", "Weak"))
         statement = label(question.statement, "HeroTitle")
         qlayout.addWidget(statement)
         self.option_buttons = {}
@@ -175,17 +207,19 @@ class QuestionsPage(QWidget):
             button.clicked.connect(lambda checked=False, value=letter: self._select_answer(value))
             self.option_buttons[letter] = button
             qlayout.addWidget(button)
-        if self.answered:
+        if show_result:
             qlayout.addWidget(label(f"Gabarito: {question.correct_answer}", "SectionTitle"))
+            if latest_answer and not self.selected_answer:
+                qlayout.addWidget(label(f"Última resposta: {latest_answer.get('selected_answer', '')}", "Muted"))
             if question.explanation:
                 qlayout.addWidget(label(question.explanation, "Muted"))
-            self._paint_answers(question)
+            self._paint_answers(question, display_answer)
         center.addWidget(qcard)
 
         controls = QHBoxLayout()
         previous = QPushButton("Anterior")
         previous.clicked.connect(self._previous)
-        answer = QPushButton("Responder")
+        answer = QPushButton("Responder novamente" if latest_answer and not self.answered else "Responder")
         answer.setObjectName("PrimaryButton")
         answer.clicked.connect(self._answer)
         answer.setEnabled(not self.answered)
@@ -200,17 +234,26 @@ class QuestionsPage(QWidget):
         right.setFixedWidth(300)
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(16, 16, 16, 16)
-        progress = self.progress_service.get_block_progress(self.current_block.id)
         right_layout.addWidget(label("Progresso no bloco", "SectionTitle"))
         percent = int((progress.questions_answered / max(1, progress.questions_total)) * 100)
+        wrong_count = len(self.progress_service.get_question_queue(self.current_block.id, "wrong"))
+        correct_count = len(self.progress_service.get_question_queue(self.current_block.id, "correct"))
+        unanswered_count = len(self.progress_service.get_question_queue(self.current_block.id, "unanswered"))
         right_layout.addWidget(ProgressLine(percent))
         for item in [
             f"Respondidas: {progress.questions_answered}",
-            f"Acertos: {progress.questions_correct}",
-            f"Erros: {progress.questions_wrong}",
-            f"Em branco: {max(0, progress.questions_total - progress.questions_answered)}",
+            f"Corretas: {correct_count}",
+            f"Erradas: {wrong_count}",
+            f"Não respondidas: {unanswered_count}",
+            f"Tentativas nesta pergunta: {len(attempts)}",
         ]:
             right_layout.addWidget(label(item, "Muted"))
+        if attempts:
+            right_layout.addWidget(label("Histórico recente", "SectionTitle"))
+            for attempt in attempts[-4:]:
+                marker = "✓" if attempt.get("is_correct") else "×"
+                date = str(attempt.get("answered_at", "")).split("T")[0]
+                right_layout.addWidget(label(f"{marker} {attempt.get('selected_answer')} em {date}", "Weak"))
         right_layout.addStretch()
 
         self.body.addWidget(left)
@@ -233,9 +276,10 @@ class QuestionsPage(QWidget):
             show_toast(self, "Selecione uma alternativa antes de responder.", "warning")
             return
         if self.answered:
-            show_toast(self, "Esta pergunta ja foi respondida nesta tela.", "info")
+            show_toast(self, "Esta pergunta já foi respondida nesta tela.", "info")
             return
-        question = self.questions[self.current_index]
+        queue_item = self.question_queue[self.current_index]
+        question = self.questions[int(queue_item["index"])]
         self.progress_service.record_question(
             self.current_block.id,
             question.id,
@@ -252,26 +296,39 @@ class QuestionsPage(QWidget):
             correct=question.correct_answer,
             is_correct=is_correct,
         )
-        self.answered = True
+        updated_queue = self._fresh_question_queue()
+        next_index = next(
+            (index for index, item in enumerate(updated_queue) if item["question_id"] == question.id),
+            None,
+        )
+        if next_index is None:
+            self.question_queue = updated_queue
+            self.current_index = min(self.current_index, max(0, len(updated_queue) - 1))
+            self.selected_answer = None
+            self.answered = False
+        else:
+            self.question_queue = updated_queue
+            self.current_index = next_index
+            self.answered = True
         self._render_session()
 
-    def _paint_answers(self, question: Question) -> None:
+    def _paint_answers(self, question: Question, selected_answer: str | None = None) -> None:
         for letter, button in self.option_buttons.items():
             if letter == question.correct_answer:
                 button.setStyleSheet(f"border-color: {COLORS['green']}; color: {COLORS['green']};")
-            elif letter == self.selected_answer:
+            elif letter == (selected_answer or self.selected_answer):
                 button.setStyleSheet(f"border-color: {COLORS['red']}; color: {COLORS['red']};")
 
     def _previous(self) -> None:
-        if self.questions:
+        if self.question_queue:
             self.current_index = max(0, self.current_index - 1)
             self.selected_answer = None
             self.answered = False
             self._render_session()
 
     def _next(self) -> None:
-        if self.questions:
-            self.current_index = min(len(self.questions) - 1, self.current_index + 1)
+        if self.question_queue:
+            self.current_index = min(len(self.question_queue) - 1, self.current_index + 1)
             self.selected_answer = None
             self.answered = False
             self._render_session()
@@ -290,6 +347,12 @@ class QuestionsPage(QWidget):
         if not subject:
             return None
         return next((module for module in subject.modules if module.name == self.module_combo.currentText()), None)
+
+    def _fresh_question_queue(self) -> list[dict[str, object]]:
+        if not self.current_block:
+            return []
+        filter_mode = str(self.filter_combo.currentData() or "all") if hasattr(self, "filter_combo") else "all"
+        return self.progress_service.get_question_queue(self.current_block.id, filter_mode)
 
     def _clear_layout(self, layout) -> None:
         while layout.count():
