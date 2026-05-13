@@ -183,6 +183,7 @@ class ImportPage(QWidget):
                 self.subject_combo.setEditText(current_subject)
         self.subject_combo.blockSignals(False)
         self._refresh_modules()
+        self._refresh_destination_mode()
 
     def _build_stepper(self) -> None:
         card = QFrame()
@@ -373,6 +374,16 @@ class ImportPage(QWidget):
                 "Muted",
             )
         )
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(label("Modo de salvamento", "Weak"))
+        self.save_mode_combo = QComboBox()
+        self.save_mode_combo.addItem("Criar novo bloco", "create")
+        self.save_mode_combo.addItem("Atualizar bloco existente", "update")
+        self.save_mode_combo.currentIndexChanged.connect(self._refresh_destination_mode)
+        mode_row.addWidget(self.save_mode_combo)
+        mode_row.addStretch()
+        layout.addLayout(mode_row)
+
         row = QHBoxLayout()
         self.subject_combo = QComboBox()
         self.subject_combo.setEditable(True)
@@ -381,12 +392,18 @@ class ImportPage(QWidget):
         self.module_combo = QComboBox()
         self.module_combo.setEditable(True)
         self.module_combo.setPlaceholderText("Modulo")
+        self.module_combo.currentTextChanged.connect(self._refresh_existing_blocks)
         self.block_title = QLineEdit()
         self.block_title.setPlaceholderText("Nome do bloco de estudo")
         row.addWidget(self.subject_combo)
         row.addWidget(self.module_combo)
         row.addWidget(self.block_title, 1)
         layout.addLayout(row)
+        self.existing_block_label = label("Bloco existente", "Weak")
+        self.existing_block_combo = QComboBox()
+        self.existing_block_combo.setToolTip("Escolha o bloco que recebera o novo pacote importado.")
+        layout.addWidget(self.existing_block_label)
+        layout.addWidget(self.existing_block_combo)
         self.description_input = QLineEdit()
         self.description_input.setPlaceholderText("Descricao opcional")
         layout.addWidget(self.description_input)
@@ -453,7 +470,7 @@ class ImportPage(QWidget):
         label_widget.setText(texts.get(status, status))
         label_widget.setStyleSheet(f"color: {color}; font-size: 12px;")
 
-    def _refresh_modules(self) -> None:
+    def _refresh_modules(self, *_args: object) -> None:
         if not hasattr(self, "module_combo"):
             return
         selected = self.subject_combo.currentText().strip()
@@ -476,6 +493,60 @@ class ImportPage(QWidget):
             else:
                 self.module_combo.setEditText(current_module)
         self.module_combo.blockSignals(False)
+        self._refresh_existing_blocks()
+
+    def _refresh_existing_blocks(self, *_args: object) -> None:
+        if not hasattr(self, "existing_block_combo"):
+            return
+        current = self.existing_block_combo.currentData()
+        subject_ref = self.subject_combo.currentText().strip()
+        module_ref = self.module_combo.currentText().strip()
+        self.existing_block_combo.blockSignals(True)
+        self.existing_block_combo.clear()
+        blocks = []
+        if subject_ref and module_ref:
+            try:
+                blocks = self.storage.list_blocks(subject_ref, module_ref)
+            except ValueError:
+                blocks = []
+        for block in blocks:
+            self.existing_block_combo.addItem(block.title, block.id)
+        if current:
+            for index in range(self.existing_block_combo.count()):
+                if self.existing_block_combo.itemData(index) == current:
+                    self.existing_block_combo.setCurrentIndex(index)
+                    break
+        if self.existing_block_combo.count() == 0:
+            self.existing_block_combo.addItem("Nenhum bloco existente neste modulo", None)
+        self.existing_block_combo.blockSignals(False)
+        self._refresh_destination_mode()
+
+    def _refresh_destination_mode(self, *_args: object) -> None:
+        if not hasattr(self, "save_mode_combo"):
+            return
+        update_mode = self._is_update_mode()
+        has_existing_block = bool(self.existing_block_combo.currentData()) if hasattr(self, "existing_block_combo") else False
+        self.block_title.setEnabled(not update_mode)
+        self.block_title.setToolTip(
+            "No modo de atualizacao, o titulo vem do bloco existente."
+            if update_mode
+            else ""
+        )
+        self.existing_block_label.setVisible(update_mode)
+        self.existing_block_combo.setVisible(update_mode)
+        self.existing_block_combo.setEnabled(update_mode and has_existing_block)
+        self.save_button.setText("Atualizar bloco de estudo" if update_mode else "Salvar bloco de estudo")
+
+    def _is_update_mode(self) -> bool:
+        if not hasattr(self, "save_mode_combo"):
+            return False
+        return self.save_mode_combo.currentData() == "update"
+
+    def _selected_existing_block_title(self) -> str:
+        if not hasattr(self, "existing_block_combo"):
+            return ""
+        data = self.existing_block_combo.currentData()
+        return self.existing_block_combo.currentText().strip() if data else ""
 
     def _choose_files(self) -> None:
         files, _ = QFileDialog.getOpenFileNames(
@@ -679,7 +750,11 @@ class ImportPage(QWidget):
         )
         subject = self.subject_combo.currentText().strip() or "Materia a definir"
         module = self.module_combo.currentText().strip() or "Modulo a definir"
-        block = self.block_title.text().strip() or "Bloco de estudo a definir"
+        block = (
+            self._selected_existing_block_title()
+            if self._is_update_mode()
+            else self.block_title.text().strip()
+        ) or "Bloco de estudo a definir"
         self.prompt_text = self.prompt_builder.build(
             subject_name=subject,
             module_name=module,
@@ -762,9 +837,19 @@ class ImportPage(QWidget):
         module_name = self.module_combo.currentText().strip()
         title = self.block_title.text().strip()
         description = self.description_input.text().strip() or None
-        if not subject_name or not module_name or not title:
+        update_mode = self._is_update_mode()
+        existing_block_id = (
+            self.existing_block_combo.currentData()
+            if hasattr(self, "existing_block_combo")
+            else None
+        )
+        if not subject_name or not module_name or (not update_mode and not title):
             self._set_step_status(5, "warning")
             show_toast(self, "Escolha ou crie uma matéria, um módulo e informe o nome do bloco.", "warning")
+            return
+        if update_mode and not existing_block_id:
+            self._set_step_status(5, "warning")
+            show_toast(self, "Selecione um bloco existente para atualizar.", "warning")
             return
 
         try:
@@ -772,24 +857,51 @@ class ImportPage(QWidget):
             try:
                 subject = self.storage.get_subject(subject_name)
             except ValueError:
+                if update_mode:
+                    self._set_step_status(5, "warning")
+                    show_toast(self, "Para atualizar, escolha uma materia existente.", "warning")
+                    set_button_loading(self.save_button, False)
+                    return
                 subject = self.subject_service.create_subject(subject_name)
                 log_action("subject_created_from_import", subject=subject.name)
             try:
                 _, module = self.storage.get_module(subject.slug, module_name)
             except ValueError:
+                if update_mode:
+                    self._set_step_status(5, "warning")
+                    show_toast(self, "Para atualizar, escolha um modulo existente.", "warning")
+                    set_button_loading(self.save_button, False)
+                    return
                 module = self.module_service.create_module(subject.slug, module_name)
                 log_action("module_created_from_import", subject=subject.name, module=module.name)
 
-            block = self.block_service.save_imported_package(
-                subject_ref=subject.slug,
-                module_ref=module.slug,
-                title=title,
-                extraction=self.extraction_result,
-                generated_prompt=self.prompt_preview.toPlainText(),
-                response_text=self.ai_response.toPlainText(),
-                parsed_response=self.parsed_response,
-                description=description,
-            )
+            if update_mode:
+                block = self.block_service.update_imported_package(
+                    block_id=str(existing_block_id),
+                    extraction=self.extraction_result,
+                    generated_prompt=self.prompt_preview.toPlainText(),
+                    response_text=self.ai_response.toPlainText(),
+                    parsed_response=self.parsed_response,
+                    description=description,
+                )
+                subject, module, block = self.storage.get_block_by_id(block.id)
+                action_text = "atualizado"
+                toast_text = "Bloco de estudo atualizado com sucesso."
+                log_name = "import_package_updated"
+            else:
+                block = self.block_service.save_imported_package(
+                    subject_ref=subject.slug,
+                    module_ref=module.slug,
+                    title=title,
+                    extraction=self.extraction_result,
+                    generated_prompt=self.prompt_preview.toPlainText(),
+                    response_text=self.ai_response.toPlainText(),
+                    parsed_response=self.parsed_response,
+                    description=description,
+                )
+                action_text = "criado"
+                toast_text = "Bloco de estudo salvo com sucesso."
+                log_name = "import_package_saved"
             self.current_block = block
             self._set_step_status(5, "done")
             self._set_step_status(6, "done")
@@ -797,13 +909,13 @@ class ImportPage(QWidget):
                 button.setEnabled(True)
                 button.setToolTip("")
             self.status.setText(
-                f"Bloco criado: {subject.name} > {module.name} > {block.title}. "
+                f"Bloco {action_text}: {subject.name} > {module.name} > {block.title}. "
                 f"{len(block.flashcards)} flashcards e {len(block.questions)} perguntas."
             )
             flash_button_success(self.save_button, "Salvo!")
-            show_toast(self, "Bloco de estudo salvo com sucesso.", "success")
+            show_toast(self, toast_text, "success")
             log_action(
-                "import_package_saved",
+                log_name,
                 block_id=block.id,
                 subject=subject.name,
                 module=module.name,

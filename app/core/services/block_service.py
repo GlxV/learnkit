@@ -183,6 +183,35 @@ class BlockService:
         self._ensure_progress_file(block.id)
         return block
 
+    def update_imported_package(
+        self,
+        block_id: str,
+        extraction: FileExtractionResult,
+        generated_prompt: str,
+        response_text: str,
+        parsed_response: ParsedAIResponse,
+        description: str | None = None,
+    ) -> StudyBlock:
+        subject, module, block = self.storage.get_block_by_id(block_id)
+        if description is not None:
+            block.description = description
+        block.imported_files = [item.imported_file for item in extraction.files]
+        block.extracted_content = extraction.combined_content
+        block.generated_prompt = generated_prompt
+        block.ai_response_raw = response_text
+        block.ai_response = parsed_response.ai_response
+        block.summary = (
+            parsed_response.summary if parsed_response.summary.content.strip() else None
+        )
+        block.summary_visual = parsed_response.summary_visual
+        block.preferred_summary_mode = "visual" if parsed_response.summary_visual else "text"
+        block.flashcards = parsed_response.flashcards
+        block.questions = parsed_response.questions
+        block.touch()
+        self.storage.save_block(subject, module, block)
+        self._ensure_progress_file(block.id)
+        return block
+
     def show_summary(self, subject_ref: str, module_ref: str, block_ref: str) -> Summary | None:
         return self.storage.get_block(subject_ref, module_ref, block_ref)[2].summary
 

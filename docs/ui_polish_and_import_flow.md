@@ -17,7 +17,7 @@
 2. Extracao: extrair texto em `QThread`, ver contagens, avisos, falhas e preview.
 3. Prompt: gerar prompt com opcoes avancadas de quantidade, dificuldade e linguagem.
 4. Resposta da IA: colar Markdown e validar o parser.
-5. Salvar no LearnKit: escolher ou criar materia, modulo e nome do bloco.
+5. Salvar no LearnKit: criar um bloco novo ou atualizar um bloco existente.
 6. Resultado: abrir resumo, flashcards, perguntas ou modulo.
 
 ## Regras de validacao
@@ -26,12 +26,13 @@
 - Sem texto extraido: `Gerar prompt` fica desabilitado e tambem valida no clique.
 - Sem resposta da IA: `Validar resposta` mostra toast.
 - Resposta sem conteudo reconhecido: nao habilita salvamento.
-- Sem materia/modulo/bloco no final: `Salvar bloco de estudo` mostra aviso.
+- Sem materia/modulo/bloco no final no modo criar: `Salvar bloco de estudo` mostra aviso.
+- No modo atualizar, e obrigatorio escolher uma materia, um modulo e um bloco existente.
 - Conteudo parcial com warnings pode ser salvo depois da validacao.
 
 ## Core ajustado
 
-Foi adicionado `BlockService.save_imported_package(...)` para salvar, em uma unica operacao:
+Foi adicionado `BlockService.save_imported_package(...)` para salvar um novo bloco, em uma unica operacao:
 
 - arquivos importados;
 - texto extraido;
@@ -44,6 +45,8 @@ Foi adicionado `BlockService.save_imported_package(...)` para salvar, em uma uni
 
 Esse metodo preserva a separacao entre UI e core e evita que a tela manipule JSON diretamente.
 
+Tambem foi adicionado `BlockService.update_imported_package(...)` para substituir o pacote de estudo de um bloco existente sem criar duplicatas. Quando flashcards ou perguntas sao trocados, o progresso salvo para itens antigos e limpo automaticamente para nao apontar para cards/perguntas que nao existem mais.
+
 ## Como testar
 
 1. Rode `python -m app.main`.
@@ -53,8 +56,10 @@ Esse metodo preserva a separacao entre UI e core e evita que a tela manipule JSO
 5. Gere e copie o prompt.
 6. Cole `tests/fixtures/sample_ai_response.md`.
 7. Valide a resposta.
-8. So no passo final escolha/crie materia, modulo e bloco.
-9. Salve e abra resumo/flashcards/perguntas.
+8. No passo final, escolha `Criar novo bloco` ou `Atualizar bloco existente`.
+9. Para criar, escolha/crie materia e modulo e informe o nome do bloco.
+10. Para atualizar, escolha materia, modulo e o bloco existente.
+11. Salve e abra resumo/flashcards/perguntas.
 
 ## Limitacoes restantes
 

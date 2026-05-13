@@ -34,7 +34,7 @@ Use este roteiro para validar a UI depois de alteracoes em botoes, navegacao ou 
 22. Colar em `Resposta da IA` o conteudo de `tests/fixtures/sample_ai_response.md`.
 23. Clicar em `Validar resposta`.
 24. Confirmar que aparecem resumo, 3 flashcards e 3 perguntas.
-25. No passo `Salvar no LearnKit`, escolher `Teste UI`, `Modulo 1` e digitar `Bloco TXT`.
+25. No passo `Salvar no LearnKit`, manter `Criar novo bloco`, escolher `Teste UI`, `Modulo 1` e digitar `Bloco TXT`.
 26. Clicar em `Salvar bloco de estudo`.
 27. Confirmar toast e mensagem de bloco criado.
 28. Clicar em `Abrir resumo`.
@@ -51,6 +51,12 @@ Use este roteiro para validar a UI depois de alteracoes em botoes, navegacao ou 
 39. Confirmar que progresso, cards revisados e perguntas respondidas mudaram.
 40. Fechar e abrir o app novamente.
 41. Confirmar que materia, modulo, bloco, cards, perguntas e progresso persistiram.
+42. Repetir a importacao com outro arquivo ou resposta.
+43. No passo `Salvar no LearnKit`, trocar para `Atualizar bloco existente`.
+44. Escolher `Teste UI`, `Modulo 1` e `Bloco TXT`.
+45. Clicar em `Atualizar bloco de estudo`.
+46. Confirmar que nao foi criado um segundo bloco duplicado.
+47. Confirmar que resumo, flashcards, perguntas e progresso foram atualizados.
 
 ## Auditoria de botoes principais
 
@@ -64,7 +70,7 @@ Use este roteiro para validar a UI depois de alteracoes em botoes, navegacao ou 
 8. Estudos: testar dropdowns, resumo, flashcards, perguntas e blocos da lista.
 9. Flashcards: testar dropdowns, lista lateral, virar card, anterior, proximo, dificil, dominei e pular.
 10. Perguntas: testar dropdowns, lista lateral, selecionar alternativa, responder, anterior e proxima.
-11. Importacao/IA: testar selecionar arquivos sem materia, limpar lista, extrair, gerar, copiar, abrir Gemini, validar resposta, escolher destino no final e salvar bloco.
+11. Importacao/IA: testar selecionar arquivos sem materia, limpar lista, extrair, gerar, copiar, abrir Gemini, validar resposta, criar bloco novo e atualizar bloco existente.
 12. Configuracoes: salvar, abrir pasta de dados, exportar dados, criar backup, limpar cache e itens futuros.
 
 ## Testes especificos de polish

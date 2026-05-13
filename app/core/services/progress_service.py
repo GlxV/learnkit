@@ -53,6 +53,8 @@ class ProgressService:
         }.get(status)
         if normalized is None:
             raise ValueError("Status de flashcard invalido.")
+        _, _, block = self.storage.get_block_by_id(block_id)
+        flashcard_id = self._resolve_flashcard_id(block, flashcard_id)
         progress = self.get_block_progress(block_id)
         progress.reviewed_flashcards[flashcard_id] = normalized
         progress.flashcard_reviews[flashcard_id] = self._next_flashcard_review(
@@ -107,6 +109,8 @@ class ProgressService:
     ) -> StudyProgress:
         selected = selected_answer.strip().upper()
         correct = correct_answer.strip().upper()
+        _, _, block = self.storage.get_block_by_id(block_id)
+        question_id = self._resolve_question_id(block, question_id)
         progress = self.get_block_progress(block_id)
         attempt = {
             "selected_answer": selected,
@@ -257,6 +261,28 @@ class ProgressService:
         }
 
     def _with_totals(self, progress: StudyProgress, block: StudyBlock) -> StudyProgress:
+        valid_flashcards = {card.id for card in block.flashcards}
+        valid_questions = {question.id for question in block.questions}
+        progress.reviewed_flashcards = {
+            card_id: status
+            for card_id, status in progress.reviewed_flashcards.items()
+            if card_id in valid_flashcards
+        }
+        progress.flashcard_reviews = {
+            card_id: review
+            for card_id, review in progress.flashcard_reviews.items()
+            if card_id in valid_flashcards
+        }
+        progress.answered_questions = {
+            question_id: answer
+            for question_id, answer in progress.answered_questions.items()
+            if question_id in valid_questions
+        }
+        progress.question_attempts = {
+            question_id: attempts
+            for question_id, attempts in progress.question_attempts.items()
+            if question_id in valid_questions
+        }
         progress.flashcards_total = len(block.flashcards)
         progress.questions_total = len(block.questions)
         progress.flashcards_reviewed = len(progress.reviewed_flashcards)
@@ -330,6 +356,30 @@ class ProgressService:
         if parsed.tzinfo is None:
             return parsed.replace(tzinfo=timezone.utc)
         return parsed
+
+    def _resolve_flashcard_id(self, block: StudyBlock, flashcard_id: str) -> str:
+        if flashcard_id in {card.id for card in block.flashcards}:
+            return flashcard_id
+        if flashcard_id.startswith("card-"):
+            try:
+                index = int(flashcard_id.removeprefix("card-")) - 1
+            except ValueError:
+                return flashcard_id
+            if 0 <= index < len(block.flashcards):
+                return block.flashcards[index].id
+        return flashcard_id
+
+    def _resolve_question_id(self, block: StudyBlock, question_id: str) -> str:
+        if question_id in {question.id for question in block.questions}:
+            return question_id
+        if question_id.startswith("question-"):
+            try:
+                index = int(question_id.removeprefix("question-")) - 1
+            except ValueError:
+                return question_id
+            if 0 <= index < len(block.questions):
+                return block.questions[index].id
+        return question_id
 
     def _activity_for_block(
         self,

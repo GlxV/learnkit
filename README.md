@@ -156,9 +156,13 @@ Também existe o atalho Windows:
 6. Cole o prompt em uma IA externa gratuita.
 7. Cole a resposta no LearnKit.
 8. Valide a resposta.
-9. Escolha ou crie matéria, módulo e bloco.
-10. Salve o bloco.
-11. Estude pelo resumo, flashcards ou perguntas.
+9. Escolha o modo de salvamento.
+10. Para criar um bloco novo, escolha/crie matéria e módulo e informe o nome do bloco.
+11. Para atualizar, escolha uma matéria, um módulo e um bloco existente.
+12. Salve o pacote no LearnKit.
+13. Estude pelo resumo, flashcards ou perguntas.
+
+Ao atualizar um bloco existente, o LearnKit substitui resumo, flashcards, perguntas, texto extraído, prompt e resposta da IA daquele bloco. O progresso antigo de flashcards/perguntas removidos é limpo para não ficar apontando para itens que não existem mais.
 
 ## Formato da resposta da IA
 
