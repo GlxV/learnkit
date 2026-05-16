@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QCompleter, QFrame, QHBoxLayout, QLineEdit
 
 from app.ui.components.icons import LineIcon
 from app.ui.components.subject_selector import SubjectSelector
-from app.ui.mock_data import UISubject
+from app.application.query_services.ui_data_provider import UISubject
 
 
 class TopBar(QFrame):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
-from app.ui.mock_data import UISubject
+from app.application.query_services.ui_data_provider import UISubject
 
 
 class ModuleTree(QTreeWidget):

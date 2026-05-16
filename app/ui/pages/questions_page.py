@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
+from app.application.query_services.study_session_query_service import StudySessionQueryService
+from app.application.query_services.ui_data_provider import UIBlock, UIDataProvider, UIModule, UISubject
+from app.application.use_cases.answer_question import AnswerQuestionUseCase
 from app.core.models.question import Question
 from app.core.models.study_block import StudyBlock
-from app.core.services.progress_service import ProgressService
 from app.core.storage.local_storage import LocalStorage
 from app.ui.components.cards import EmptyState, ProgressLine, label
 from app.ui.feedback import log_action, show_toast
-from app.ui.mock_data import UIDataProvider, UIBlock, UIModule, UISubject
 from app.ui.pages.base import panel, scroll_page
 from app.ui.theme import COLORS
 
@@ -17,8 +18,8 @@ class QuestionsPage(QWidget):
     def __init__(self, provider: UIDataProvider, storage: LocalStorage) -> None:
         super().__init__()
         self.provider = provider
-        self.storage = storage
-        self.progress_service = ProgressService(storage)
+        self.study_session_query_service = StudySessionQueryService(storage)
+        self.answer_question_use_case = AnswerQuestionUseCase(storage)
         self.subjects = provider.subjects()
         self.current_block: StudyBlock | None = None
         self.questions: list[Question] = []
@@ -96,16 +97,16 @@ class QuestionsPage(QWidget):
 
     def select_block_by_id(self, block_id: str) -> None:
         self.refresh()
-        _, module, block = self.storage.get_block_by_id(block_id)
-        subject = next((item for item in self.subjects if any(mod.id == module.id for mod in item.modules)), None)
+        context = self.study_session_query_service.block_context(block_id)
+        subject = next((item for item in self.subjects if item.name == context.subject.name), None)
         if subject:
             subject_index = self.subject_combo.findText(subject.name)
             if subject_index >= 0:
                 self.subject_combo.setCurrentIndex(subject_index)
-        module_index = self.module_combo.findText(module.name)
+        module_index = self.module_combo.findText(context.module.name)
         if module_index >= 0:
             self.module_combo.setCurrentIndex(module_index)
-        block_index = self.block_combo.findData(block.id)
+        block_index = self.block_combo.findData(context.block.id)
         if block_index >= 0:
             self.block_combo.setCurrentIndex(block_index)
 
@@ -129,10 +130,13 @@ class QuestionsPage(QWidget):
         block_id = self.block_combo.currentData()
         if not block_id:
             return
-        _, _, block = self.storage.get_block_by_id(block_id)
-        self.current_block = block
-        self.questions = block.questions
-        self.question_queue = self._fresh_question_queue()
+        session = self.study_session_query_service.question_session(
+            str(block_id),
+            self._selected_filter_mode(),
+        )
+        self.current_block = session.block
+        self.questions = session.questions
+        self.question_queue = session.queue
         self.current_index = 0
         self.selected_answer = None
         self.answered = False
@@ -180,7 +184,11 @@ class QuestionsPage(QWidget):
         left_layout.addStretch()
 
         center = QVBoxLayout()
-        progress = self.progress_service.get_block_progress(self.current_block.id)
+        session = self.study_session_query_service.question_session(
+            self.current_block.id,
+            self._selected_filter_mode(),
+        )
+        progress = session.progress
         queue_item = self.question_queue[self.current_index]
         question = self.questions[int(queue_item["index"])]
         latest_answer = progress.answered_questions.get(question.id, {})
@@ -236,9 +244,9 @@ class QuestionsPage(QWidget):
         right_layout.setContentsMargins(16, 16, 16, 16)
         right_layout.addWidget(label("Progresso no bloco", "SectionTitle"))
         percent = int((progress.questions_answered / max(1, progress.questions_total)) * 100)
-        wrong_count = len(self.progress_service.get_question_queue(self.current_block.id, "wrong"))
-        correct_count = len(self.progress_service.get_question_queue(self.current_block.id, "correct"))
-        unanswered_count = len(self.progress_service.get_question_queue(self.current_block.id, "unanswered"))
+        wrong_count = len(self.study_session_query_service.question_session(self.current_block.id, "wrong").queue)
+        correct_count = len(self.study_session_query_service.question_session(self.current_block.id, "correct").queue)
+        unanswered_count = len(self.study_session_query_service.question_session(self.current_block.id, "unanswered").queue)
         right_layout.addWidget(ProgressLine(percent))
         for item in [
             f"Respondidas: {progress.questions_answered}",
@@ -280,7 +288,7 @@ class QuestionsPage(QWidget):
             return
         queue_item = self.question_queue[self.current_index]
         question = self.questions[int(queue_item["index"])]
-        self.progress_service.record_question(
+        self.answer_question_use_case.execute(
             self.current_block.id,
             question.id,
             self.selected_answer,
@@ -351,8 +359,13 @@ class QuestionsPage(QWidget):
     def _fresh_question_queue(self) -> list[dict[str, object]]:
         if not self.current_block:
             return []
-        filter_mode = str(self.filter_combo.currentData() or "all") if hasattr(self, "filter_combo") else "all"
-        return self.progress_service.get_question_queue(self.current_block.id, filter_mode)
+        return self.study_session_query_service.question_session(
+            self.current_block.id,
+            self._selected_filter_mode(),
+        ).queue
+
+    def _selected_filter_mode(self) -> str:
+        return str(self.filter_combo.currentData() or "all") if hasattr(self, "filter_combo") else "all"
 
     def _clear_layout(self, layout) -> None:
         while layout.count():
@@ -361,3 +374,4 @@ class QuestionsPage(QWidget):
                 item.widget().deleteLater()
             elif item.layout():
                 self._clear_layout(item.layout())
+

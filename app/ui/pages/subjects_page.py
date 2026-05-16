@@ -23,14 +23,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.core.services.block_service import BlockService
-from app.core.services.module_service import ModuleService
+from app.application.use_cases.manage_subject_catalog import ManageSubjectCatalogUseCase
 from app.ui.feedback import confirm_action, log_action, show_toast
 from app.ui.icon_catalog import MODULE_PRESETS, SUBJECT_ICON_LABELS, SUBJECT_ICONS, subject_icon_for_name
 from app.ui.components.cards import EmptyState, ProgressLine, StatCard, StudyBlockRow, SubjectCard, label
 from app.ui.components.icons import LineIcon
 from app.ui.components.visual import IconBadge
-from app.ui.mock_data import UIDataProvider, UIModule, UISubject
+from app.application.query_services.ui_data_provider import UIDataProvider, UIModule, UISubject
 from app.ui.pages.base import panel, scroll_page
 from app.ui.theme import COLORS
 
@@ -434,6 +433,7 @@ class SubjectsPage(QWidget):
     def __init__(self, provider: UIDataProvider) -> None:
         super().__init__()
         self.provider = provider
+        self.catalog_use_case = ManageSubjectCatalogUseCase(provider.storage)
         self.subjects = provider.subjects()
         self.selected_subject: UISubject | None = self.subjects[0] if self.subjects else None
         self.selected_module: UIModule | None = (
@@ -656,7 +656,7 @@ class SubjectsPage(QWidget):
         dialog = NewSubjectDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.name.text().strip():
             name = dialog.name.text().strip()
-            self.provider.create_subject(
+            self.catalog_use_case.create_subject(
                 name,
                 dialog.description.toPlainText().strip(),
                 color=dialog.selected_color,
@@ -678,7 +678,7 @@ class SubjectsPage(QWidget):
         dialog = NewSubjectDialog(self, self.selected_subject)
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.name.text().strip():
             name = dialog.name.text().strip()
-            self.provider.update_subject(
+            self.catalog_use_case.update_subject(
                 original_ref,
                 name,
                 dialog.description.toPlainText().strip(),
@@ -706,7 +706,7 @@ class SubjectsPage(QWidget):
             return
         dialog = NewModuleDialog(self.selected_subject.name, self)
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.name.text().strip():
-            self.provider.create_module(
+            self.catalog_use_case.create_module(
                 self.selected_subject.name,
                 dialog.name.text().strip(),
                 dialog.description.toPlainText().strip(),
@@ -720,7 +720,7 @@ class SubjectsPage(QWidget):
             return
         if confirm_action(self, "Excluir materia", f"Excluir '{self.selected_subject.name}' e todos os modulos/blocos locais?"):
             name = self.selected_subject.name
-            self.provider.storage.delete_subject(self.selected_subject.name)
+            self.catalog_use_case.delete_subject(self.selected_subject.name)
             show_toast(self, f"Materia excluida: {name}", "success")
             log_action("subject_deleted", subject=name)
             self.refresh()
@@ -729,7 +729,7 @@ class SubjectsPage(QWidget):
         if not self.selected_subject:
             return
         if confirm_action(self, "Excluir modulo", f"Excluir o modulo '{module.name}'?"):
-            ModuleService(self.provider.storage).delete_module(self.selected_subject.name, module.name)
+            self.catalog_use_case.delete_module(self.selected_subject.name, module.name)
             show_toast(self, f"Modulo excluido: {module.name}", "success")
             log_action("module_deleted", subject=self.selected_subject.name, module=module.name)
             self.refresh()
@@ -738,7 +738,7 @@ class SubjectsPage(QWidget):
         if not self.selected_subject or not self.selected_module:
             return
         if confirm_action(self, "Excluir bloco", f"Excluir o bloco '{block_title}'?"):
-            BlockService(self.provider.storage).delete_block(
+            self.catalog_use_case.delete_block(
                 self.selected_subject.name,
                 self.selected_module.name,
                 block_title,

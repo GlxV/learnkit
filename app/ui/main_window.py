@@ -20,12 +20,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.application.query_services.search_query_service import SearchQueryService
+from app.application.query_services.ui_data_provider import UIDataProvider
 from app.core.database import SQLiteStorage
 from app.ui.components.sidebar import Sidebar
 from app.ui.components.toast import Toast
 from app.ui.components.topbar import TopBar
 from app.ui.feedback import log_action
-from app.ui.mock_data import UIDataProvider
 from app.ui.pages.database_page import DatabasePage
 from app.ui.pages.flashcards_page import FlashcardsPage
 from app.ui.pages.home_page import HomePage
@@ -88,6 +89,7 @@ class MainWindow(QMainWindow):
         self.storage = SQLiteStorage("data/learnkit.db")
         self._apply_saved_theme()
         self.provider = UIDataProvider(self.storage)
+        self.search_query_service = SearchQueryService(self.storage)
         self.subjects = self.provider.subjects()
         self.subject_filter = "Todas as matérias"
         self._search_targets: dict[str, dict[str, str]] = {}
@@ -235,37 +237,7 @@ class MainWindow(QMainWindow):
             page.select_block_by_id(block_id)
 
     def _collect_search_results(self, query: str) -> list[tuple[str, str, dict[str, str]]]:
-        normalized = query.casefold()
-        results: list[tuple[str, str, dict[str, str]]] = []
-        for subject in self.storage.list_subjects():
-            if normalized in subject.name.casefold():
-                results.append((subject.name, "Matéria", {"kind": "subject", "subject": subject.name}))
-            if subject.description and normalized in subject.description.casefold():
-                results.append((subject.name, "Resumo da matéria", {"kind": "subject", "subject": subject.name}))
-            for module in self.storage.list_modules(subject.slug):
-                if normalized in module.name.casefold():
-                    results.append(
-                        (
-                            module.name,
-                            f"Módulo em {subject.name}",
-                            {"kind": "module", "subject": subject.name, "module": module.name},
-                        )
-                    )
-                for block in self.storage.list_blocks(subject.slug, module.slug):
-                    block_target = {"kind": "block", "block_id": block.id}
-                    if normalized in block.title.casefold():
-                        results.append((block.title, f"Bloco em {subject.name} > {module.name}", block_target))
-                    if block.summary and normalized in block.summary.content.casefold():
-                        results.append((block.title, f"Resumo em {subject.name} > {module.name}", block_target))
-                    for card in block.flashcards:
-                        haystack = f"{card.question} {card.answer}".casefold()
-                        if normalized in haystack:
-                            results.append((card.question[:90], f"Flashcard em {block.title}", {"kind": "flashcard", "block_id": block.id}))
-                    for question in block.questions:
-                        haystack = " ".join([question.statement, *question.alternatives.values()]).casefold()
-                        if normalized in haystack:
-                            results.append((question.statement[:90], f"Pergunta em {block.title}", {"kind": "question", "block_id": block.id}))
-        return results[:50]
+        return self.search_query_service.search(query, limit=50)
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
@@ -296,3 +268,4 @@ class MainWindow(QMainWindow):
             app = QApplication.instance()
             if app is not None:
                 apply_app_theme_settings(app, settings)
+

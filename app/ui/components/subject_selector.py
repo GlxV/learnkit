@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QComboBox
 
-from app.ui.mock_data import UISubject
+from app.application.query_services.ui_data_provider import UISubject
 
 
 class SubjectSelector(QComboBox):

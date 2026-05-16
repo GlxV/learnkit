@@ -23,13 +23,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.application.dto.study_package import ImportDestinationDTO, StudyPackageDTO, StudyPackageImportDTO
+from app.application.query_services.study_session_query_service import StudySessionQueryService
+from app.application.query_services.ui_data_provider import UISubject
+from app.application.use_cases.generate_prompt import GeneratePromptUseCase
+from app.application.use_cases.import_study_package import ImportStudyPackageUseCase
+from app.application.use_cases.parse_ai_response import ParseAIResponseUseCase
 from app.core.extractors.file_extractor import FileExtractionResult, FileExtractor
-from app.core.importer.ai_response_parser import AIResponseParser, ParsedAIResponse
 from app.core.models.study_block import StudyBlock
-from app.core.prompt.prompt_builder import PromptBuilder, PromptOptions
-from app.core.services.block_service import BlockService
-from app.core.services.module_service import ModuleService
-from app.core.services.subject_service import SubjectService
+from app.core.prompt.prompt_builder import PromptOptions
 from app.core.storage.local_storage import LocalStorage
 from app.ui.components.cards import label
 from app.ui.components.file_list_item import FileListItem
@@ -39,7 +41,6 @@ from app.ui.feedback import (
     set_button_loading,
     show_toast,
 )
-from app.ui.mock_data import UISubject
 from app.ui.pages.base import panel, scroll_page
 from app.ui.theme import COLORS
 
@@ -129,17 +130,16 @@ class ImportPage(QWidget):
         super().__init__()
         _ = subjects
         self.storage = storage or LocalStorage("data")
-        self.subject_service = SubjectService(self.storage)
-        self.module_service = ModuleService(self.storage)
-        self.block_service = BlockService(self.storage)
-        self.prompt_builder = PromptBuilder()
-        self.parser = AIResponseParser()
+        self.generate_prompt_use_case = GeneratePromptUseCase()
+        self.parse_ai_response_use_case = ParseAIResponseUseCase()
+        self.import_package_use_case = ImportStudyPackageUseCase(self.storage)
+        self.study_session_query_service = StudySessionQueryService(self.storage)
 
         self.selected_files: list[Path] = []
         self.file_statuses: dict[str, tuple[str, str]] = {}
         self.extraction_result: FileExtractionResult | None = None
         self.prompt_text = ""
-        self.parsed_response: ParsedAIResponse | None = None
+        self.parsed_response: StudyPackageDTO | None = None
         self.current_block: StudyBlock | None = None
         self.worker_thread: QThread | None = None
         self.worker: ExtractionWorker | None = None
@@ -755,7 +755,7 @@ class ImportPage(QWidget):
             if self._is_update_mode()
             else self.block_title.text().strip()
         ) or "Bloco de estudo a definir"
-        self.prompt_text = self.prompt_builder.build(
+        self.prompt_text = self.generate_prompt_use_case.execute(
             subject_name=subject,
             module_name=module,
             block_title=block,
@@ -790,8 +790,8 @@ class ImportPage(QWidget):
             self._set_step_status(4, "warning")
             show_toast(self, "Cole a resposta da IA primeiro.", "warning")
             return
-        parsed = self.parser.parse(raw)
-        has_summary = bool(parsed.summary.content.strip())
+        parsed = self.parse_ai_response_use_case.execute(raw)
+        has_summary = bool(parsed.summary_text.strip())
         has_visual = bool(parsed.summary_visual.strip())
         has_content = has_summary or has_visual or bool(parsed.flashcards) or bool(parsed.questions)
         if not has_content:
@@ -800,7 +800,7 @@ class ImportPage(QWidget):
             self._set_step_status(4, "error")
             self.response_status.setText("Não foi possível identificar conteúdo válido na resposta.")
             show_toast(self, "Resposta sem resumo, flashcards ou perguntas reconheciveis.", "error")
-            log_action("ai_response_validation_failed", warnings=len(parsed.warnings))
+            log_action("ai_response_validation_failed", warnings=len(parsed.parser_warnings))
             return
 
         self.parsed_response = parsed
@@ -808,17 +808,17 @@ class ImportPage(QWidget):
             f"Resumo texto: {'sim' if has_summary else 'nao'} - "
             f"Resumo visual: {'sim' if has_visual else 'nao'} - "
             f"{len(parsed.flashcards)} flashcards - {len(parsed.questions)} perguntas - "
-            f"{len(parsed.warnings)} avisos"
+            f"{len(parsed.parser_warnings)} avisos"
         )
         self.save_button.setEnabled(True)
         self.save_button.setToolTip("")
-        self._set_step_status(4, "warning" if parsed.warnings else "done")
+        self._set_step_status(4, "warning" if parsed.parser_warnings else "done")
         show_toast(self, "Resposta validada. Escolha o destino e salve.", "success")
         log_action(
             "ai_response_validated",
             flashcards=len(parsed.flashcards),
             questions=len(parsed.questions),
-            warnings=len(parsed.warnings),
+            warnings=len(parsed.parser_warnings),
         )
 
     def _save_block(self) -> None:
@@ -854,54 +854,34 @@ class ImportPage(QWidget):
 
         try:
             set_button_loading(self.save_button, True, "Salvando...")
-            try:
-                subject = self.storage.get_subject(subject_name)
-            except ValueError:
-                if update_mode:
-                    self._set_step_status(5, "warning")
-                    show_toast(self, "Para atualizar, escolha uma materia existente.", "warning")
-                    set_button_loading(self.save_button, False)
-                    return
-                subject = self.subject_service.create_subject(subject_name)
-                log_action("subject_created_from_import", subject=subject.name)
-            try:
-                _, module = self.storage.get_module(subject.slug, module_name)
-            except ValueError:
-                if update_mode:
-                    self._set_step_status(5, "warning")
-                    show_toast(self, "Para atualizar, escolha um modulo existente.", "warning")
-                    set_button_loading(self.save_button, False)
-                    return
-                module = self.module_service.create_module(subject.slug, module_name)
-                log_action("module_created_from_import", subject=subject.name, module=module.name)
-
-            if update_mode:
-                block = self.block_service.update_imported_package(
-                    block_id=str(existing_block_id),
+            result = self.import_package_use_case.execute(
+                StudyPackageImportDTO(
                     extraction=self.extraction_result,
                     generated_prompt=self.prompt_preview.toPlainText(),
-                    response_text=self.ai_response.toPlainText(),
-                    parsed_response=self.parsed_response,
-                    description=description,
+                    raw_ai_response=self.ai_response.toPlainText(),
+                    package=self.parsed_response,
+                    destination=ImportDestinationDTO(
+                        subject_name=subject_name,
+                        module_name=module_name,
+                        block_title=title,
+                        existing_block_id=str(existing_block_id) if existing_block_id else None,
+                        description=description,
+                    ),
+                    mode="update" if update_mode else "create",
                 )
-                subject, module, block = self.storage.get_block_by_id(block.id)
-                action_text = "atualizado"
-                toast_text = "Bloco de estudo atualizado com sucesso."
-                log_name = "import_package_updated"
-            else:
-                block = self.block_service.save_imported_package(
-                    subject_ref=subject.slug,
-                    module_ref=module.slug,
-                    title=title,
-                    extraction=self.extraction_result,
-                    generated_prompt=self.prompt_preview.toPlainText(),
-                    response_text=self.ai_response.toPlainText(),
-                    parsed_response=self.parsed_response,
-                    description=description,
-                )
-                action_text = "criado"
-                toast_text = "Bloco de estudo salvo com sucesso."
-                log_name = "import_package_saved"
+            )
+            block = result.block
+            action_text = "atualizado" if update_mode else "criado"
+            toast_text = (
+                "Bloco de estudo atualizado com sucesso."
+                if update_mode
+                else "Bloco de estudo salvo com sucesso."
+            )
+            log_name = "import_package_updated" if update_mode else "import_package_saved"
+            if result.created_subject:
+                log_action("subject_created_from_import", subject=result.subject_name)
+            if result.created_module:
+                log_action("module_created_from_import", subject=result.subject_name, module=result.module_name)
             self.current_block = block
             self._set_step_status(5, "done")
             self._set_step_status(6, "done")
@@ -909,7 +889,7 @@ class ImportPage(QWidget):
                 button.setEnabled(True)
                 button.setToolTip("")
             self.status.setText(
-                f"Bloco {action_text}: {subject.name} > {module.name} > {block.title}. "
+                f"Bloco {action_text}: {result.subject_name} > {result.module_name} > {block.title}. "
                 f"{len(block.flashcards)} flashcards e {len(block.questions)} perguntas."
             )
             flash_button_success(self.save_button, "Salvo!")
@@ -917,8 +897,8 @@ class ImportPage(QWidget):
             log_action(
                 log_name,
                 block_id=block.id,
-                subject=subject.name,
-                module=module.name,
+                subject=result.subject_name,
+                module=result.module_name,
                 flashcards=len(block.flashcards),
                 questions=len(block.questions),
             )
@@ -932,8 +912,8 @@ class ImportPage(QWidget):
     def _navigate(self, key: str) -> None:
         window = self.window()
         if self.current_block and key == "subjects" and hasattr(window, "open_subject"):
-            subject, module, _ = self.storage.get_block_by_id(self.current_block.id)
-            window.open_subject(subject.name, module.name)
+            context = self.study_session_query_service.block_context(self.current_block.id)
+            window.open_subject(context.subject.name, context.module.name)
         elif self.current_block and hasattr(window, "open_block"):
             window.open_block(self.current_block.id, key)
         elif hasattr(window, "navigate"):

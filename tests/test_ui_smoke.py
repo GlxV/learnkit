@@ -45,7 +45,7 @@ def test_edit_subject_dialog_prefills_without_initial_modules() -> None:
 
     from PySide6.QtWidgets import QApplication
 
-    from app.ui.mock_data import UISubject
+    from app.application.query_services.ui_data_provider import UISubject
     from app.ui.pages.subjects_page import NewSubjectDialog
     from app.ui.theme import apply_app_theme
 
@@ -70,16 +70,16 @@ def test_edit_subject_dialog_prefills_without_initial_modules() -> None:
     assert dialog.selected_modules() == []
 
 
-def test_ui_data_provider_updates_subject_metadata(tmp_path) -> None:
+def test_subject_catalog_use_case_updates_subject_metadata(tmp_path) -> None:
+    from app.application.use_cases.manage_subject_catalog import ManageSubjectCatalogUseCase
     from app.core.database.sqlite_storage import SQLiteStorage
-    from app.ui.mock_data import UIDataProvider
 
     storage = SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False)
-    provider = UIDataProvider(storage)
-    provider.create_subject("Matematica", "Descricao antiga", color="#3B82F6", icon="calculator")
+    use_case = ManageSubjectCatalogUseCase(storage)
+    use_case.create_subject("Matematica", "Descricao antiga", color="#3B82F6", icon="calculator")
 
     subject = storage.get_subject("Matematica")
-    provider.update_subject(
+    use_case.update_subject(
         subject.id,
         "Matematica Aplicada",
         "Descricao nova",

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.ui.mock_data import UIBlock, UIModule, UISubject
+from app.application.query_services.ui_data_provider import UIBlock, UIModule, UISubject
 from app.ui.components.icons import LineIcon
 from app.ui.theme import COLORS
 from app.ui.components.visual import IconBadge, add_shadow

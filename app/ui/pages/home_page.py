@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -13,12 +11,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.core.services.progress_service import ProgressService
+from app.application.dto.progress import (
+    ReviewActivityDTO,
+    ReviewDashboardBlockDTO,
+    ReviewDashboardDTO,
+    ReviewDashboardSummaryDTO,
+)
+from app.application.query_services.dashboard_query_service import DashboardQueryService
+from app.application.query_services.ui_data_provider import UIBlock, UIDataProvider, UIModule, UISubject
 from app.ui.components.cards import EmptyState, ProgressLine, StatCard, label
 from app.ui.components.open_source_panel import OpenSourcePanel
 from app.ui.components.progress_ring import ProgressRing
 from app.ui.components.visual import GlassPanel, IconBadge
-from app.ui.mock_data import UIBlock, UIDataProvider, UIModule, UISubject
 from app.ui.pages.base import panel, scroll_page
 from app.ui.theme import COLORS
 
@@ -30,7 +34,7 @@ class HomePage(QWidget):
     def __init__(self, provider: UIDataProvider) -> None:
         super().__init__()
         self.provider = provider
-        self.progress_service = ProgressService(provider.storage)
+        self.dashboard_query_service = DashboardQueryService(provider.storage)
         self.subject_filter = ALL_SUBJECTS
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -43,7 +47,9 @@ class HomePage(QWidget):
         subjects = self._filtered_subjects()
         blocks = [block for subject in subjects for module in subject.modules for block in module.blocks]
         modules = [module for subject in subjects for module in subject.modules]
-        dashboard = self.progress_service.get_review_dashboard(None if self.subject_filter == ALL_SUBJECTS else self.subject_filter)
+        dashboard = self.dashboard_query_service.review_dashboard_dto(
+            None if self.subject_filter == ALL_SUBJECTS else self.subject_filter
+        )
 
         title_box = QVBoxLayout()
         title_box.setSpacing(8)
@@ -51,7 +57,7 @@ class HomePage(QWidget):
         title_box.addWidget(label("Acompanhe materiais, revisões e blocos salvos localmente.", "Muted"))
         self.layout.addLayout(title_box)
 
-        self.layout.addLayout(self._stats(subjects, dashboard["summary"]))
+        self.layout.addLayout(self._stats(subjects, dashboard.summary))
 
         if not subjects:
             self.layout.addWidget(self._empty_home())
@@ -81,13 +87,13 @@ class HomePage(QWidget):
         lower.setColumnStretch(2, 1)
         lower.addWidget(self._subjects_panel(subjects), 0, 0)
         lower.addWidget(self._modules_panel(modules[:5]), 0, 1)
-        lower.addWidget(self._priority_blocks_panel(dashboard["blocks"], blocks), 0, 2)
+        lower.addWidget(self._priority_blocks_panel(dashboard.blocks, blocks), 0, 2)
         main_col.addLayout(lower)
 
-        side_col.addWidget(self._review_now_panel(dashboard["summary"]))
-        side_col.addWidget(self._activity_panel(dashboard["activity"]))
+        side_col.addWidget(self._review_now_panel(dashboard.summary))
+        side_col.addWidget(self._activity_panel(dashboard.activity))
         side_col.addWidget(OpenSourcePanel())
-        side_col.addWidget(self._progress_panel(dashboard["summary"]))
+        side_col.addWidget(self._progress_panel(dashboard.summary))
         side_col.addStretch()
         self.layout.addLayout(body)
 
@@ -100,7 +106,7 @@ class HomePage(QWidget):
             return [subject for subject in subjects if subject.name == self.subject_filter]
         return subjects
 
-    def _stats(self, subjects: list[UISubject], summary: dict[str, int]) -> QGridLayout:
+    def _stats(self, subjects: list[UISubject], summary: ReviewDashboardSummaryDTO) -> QGridLayout:
         stats_data = self.provider.global_stats()
         if self.subject_filter != ALL_SUBJECTS:
             total_modules = sum(len(subject.modules) for subject in subjects)
@@ -117,9 +123,9 @@ class HomePage(QWidget):
         cards = [
             StatCard("Matérias", str(stats_data.total_subjects), "dados locais", "subjects", COLORS["blue"]),
             StatCard("Módulos", str(stats_data.total_modules), "criados por você", "activity", COLORS["purple_soft"]),
-            StatCard("Pendências", str(summary["pending_reviews"]), "revisar agora", "progress", "#22D3EE"),
-            StatCard("Flashcards", str(stats_data.total_flashcards), f"{summary['due_flashcards']} vencidos", "flashcards", COLORS["amber"]),
-            StatCard("Perguntas", str(stats_data.total_questions), f"{summary['wrong_questions']} erradas", "questions", "#EC4899"),
+            StatCard("Pendências", str(summary.pending_reviews), "revisar agora", "progress", "#22D3EE"),
+            StatCard("Flashcards", str(stats_data.total_flashcards), f"{summary.due_flashcards} vencidos", "flashcards", COLORS["amber"]),
+            StatCard("Perguntas", str(stats_data.total_questions), f"{summary.wrong_questions} erradas", "questions", "#EC4899"),
         ]
         for index, card in enumerate(cards):
             stats.addWidget(card, 0, index)
@@ -138,7 +144,7 @@ class HomePage(QWidget):
             layout.addWidget(button)
         return card
 
-    def _continue_card(self, blocks: list[UIBlock], dashboard: dict[str, Any]) -> QWidget:
+    def _continue_card(self, blocks: list[UIBlock], dashboard: ReviewDashboardDTO) -> QWidget:
         card = GlassPanel("HeroCard")
         card.setFixedHeight(198)
         card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -155,7 +161,7 @@ class HomePage(QWidget):
             layout.addWidget(action)
             return card
 
-        block, priority = self._priority_block(blocks, dashboard["blocks"])
+        block, priority = self._priority_block(blocks, dashboard.blocks)
         row = QHBoxLayout()
         row.setSpacing(22)
         preview = QLabel("LK\nreview")
@@ -179,7 +185,9 @@ class HomePage(QWidget):
         if priority:
             meta.addWidget(
                 label(
-                    f"{priority['pending_reviews']} pendências • {priority['due_flashcards']} cards vencidos • {priority['wrong_questions']} erradas",
+                    f"{priority.pending_reviews} pendências • "
+                    f"{priority.due_flashcards} cards vencidos • "
+                    f"{priority.wrong_questions} erradas",
                     "Weak",
                 )
             )
@@ -191,7 +199,9 @@ class HomePage(QWidget):
         actions = QVBoxLayout()
         actions.setSpacing(10)
         primary_target = self._best_destination(priority)
-        continue_button = QPushButton("Revisar agora" if priority and priority["pending_reviews"] else "Continuar")
+        continue_button = QPushButton(
+            "Revisar agora" if priority and priority.pending_reviews else "Continuar"
+        )
         continue_button.setObjectName("PrimaryButton")
         continue_button.clicked.connect(lambda: self._open_block(block.id, primary_target))
         summary_button = QPushButton("Resumo")
@@ -259,7 +269,11 @@ class HomePage(QWidget):
         layout.addStretch()
         return card
 
-    def _priority_blocks_panel(self, priority_blocks: list[dict[str, Any]], fallback_blocks: list[UIBlock]) -> QWidget:
+    def _priority_blocks_panel(
+        self,
+        priority_blocks: list[ReviewDashboardBlockDTO],
+        fallback_blocks: list[UIBlock],
+    ) -> QWidget:
         card = panel()
         card.setMinimumHeight(360)
         layout = QVBoxLayout(card)
@@ -281,14 +295,18 @@ class HomePage(QWidget):
                 dot.setFixedSize(9, 9)
                 dot.setStyleSheet(f"background: {COLORS['amber']}; border-radius: 4px;")
                 text = QVBoxLayout()
-                text.addWidget(label(str(item["block_title"]), "SmallTitle"))
-                text.addWidget(label(f"{item['pending_reviews']} pendências", "Weak"))
+                text.addWidget(label(item.block_title, "SmallTitle"))
+                text.addWidget(label(f"{item.pending_reviews} pendências", "Weak"))
                 row.addWidget(dot)
                 row.addLayout(text, 1)
-                row.addWidget(ProgressRing(int(item["progress_percent"]), 42))
+                row.addWidget(ProgressRing(item.progress_percent, 42))
                 button = QPushButton("Abrir")
                 button.setObjectName("GhostButton")
-                button.clicked.connect(lambda checked=False, block_id=item["block_id"], target=self._best_destination(item): self._open_block(str(block_id), target))
+                button.clicked.connect(
+                    lambda checked=False, block_id=item.block_id, target=self._best_destination(item): (
+                        self._open_block(block_id, target)
+                    )
+                )
                 row.addWidget(button)
                 layout.addLayout(row)
             layout.addStretch()
@@ -314,17 +332,17 @@ class HomePage(QWidget):
         layout.addStretch()
         return card
 
-    def _review_now_panel(self, summary: dict[str, int]) -> QWidget:
+    def _review_now_panel(self, summary: ReviewDashboardSummaryDTO) -> QWidget:
         card = panel()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(12)
         layout.addWidget(label("Revisar agora", "SectionTitle"))
         items = [
-            ("Cards vencidos", summary["due_flashcards"], "flashcards", COLORS["amber"]),
-            ("Cards novos", summary["new_flashcards"], "flashcards", COLORS["blue"]),
-            ("Perguntas erradas", summary["wrong_questions"], "questions", "#EC4899"),
-            ("Perguntas em branco", summary["unanswered_questions"], "questions", COLORS["purple_soft"]),
+            ("Cards vencidos", summary.due_flashcards, "flashcards", COLORS["amber"]),
+            ("Cards novos", summary.new_flashcards, "flashcards", COLORS["blue"]),
+            ("Perguntas erradas", summary.wrong_questions, "questions", "#EC4899"),
+            ("Perguntas em branco", summary.unanswered_questions, "questions", COLORS["purple_soft"]),
         ]
         for title, count, destination, color in items:
             row = QHBoxLayout()
@@ -339,7 +357,7 @@ class HomePage(QWidget):
             layout.addLayout(row)
         return card
 
-    def _activity_panel(self, activity: list[dict[str, Any]]) -> QWidget:
+    def _activity_panel(self, activity: list[ReviewActivityDTO]) -> QWidget:
         card = panel()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(18, 16, 18, 16)
@@ -352,12 +370,17 @@ class HomePage(QWidget):
 
         for item in activity[:5]:
             row = QVBoxLayout()
-            row.addWidget(label(str(item["title"]), "SmallTitle"))
-            row.addWidget(label(f"{item['detail']} • {item['block_title']} • {self._date(item.get('occurred_at'))}", "Weak"))
+            row.addWidget(label(item.title, "SmallTitle"))
+            row.addWidget(
+                label(
+                    f"{item.detail} • {item.block_title} • {self._date(item.occurred_at)}",
+                    "Weak",
+                )
+            )
             layout.addLayout(row)
         return card
 
-    def _progress_panel(self, summary: dict[str, int]) -> QWidget:
+    def _progress_panel(self, summary: ReviewDashboardSummaryDTO) -> QWidget:
         stats = self.provider.global_stats()
         card = panel()
         layout = QVBoxLayout(card)
@@ -369,7 +392,7 @@ class HomePage(QWidget):
         details = QVBoxLayout()
         details.addWidget(label(f"Cards revisados: {stats.flashcards_reviewed}/{stats.total_flashcards}", "Muted"))
         details.addWidget(label(f"Perguntas respondidas: {stats.questions_answered}/{stats.total_questions}", "Muted"))
-        details.addWidget(label(f"Pendências: {summary['pending_reviews']}", "Muted"))
+        details.addWidget(label(f"Pendências: {summary.pending_reviews}", "Muted"))
         row.addLayout(details, 1)
         layout.addLayout(row)
         layout.addWidget(label(f"Progresso total: {stats.progress_percent}%", "Muted"))
@@ -394,20 +417,20 @@ class HomePage(QWidget):
     def _priority_block(
         self,
         blocks: list[UIBlock],
-        priority_blocks: list[dict[str, Any]],
-    ) -> tuple[UIBlock, dict[str, Any] | None]:
+        priority_blocks: list[ReviewDashboardBlockDTO],
+    ) -> tuple[UIBlock, ReviewDashboardBlockDTO | None]:
         by_id = {block.id: block for block in blocks if block.id}
         for item in priority_blocks:
-            block = by_id.get(str(item["block_id"]))
-            if block and int(item["pending_reviews"]) > 0:
+            block = by_id.get(item.block_id)
+            if block and item.pending_reviews > 0:
                 return block, item
         return sorted(blocks, key=lambda item: item.progress, reverse=True)[0], None
 
-    def _best_destination(self, priority: dict[str, Any] | None) -> str:
+    def _best_destination(self, priority: ReviewDashboardBlockDTO | None) -> str:
         if not priority:
             return "studies"
-        flashcard_work = int(priority.get("due_flashcards", 0)) + int(priority.get("new_flashcards", 0))
-        question_work = int(priority.get("wrong_questions", 0)) + int(priority.get("unanswered_questions", 0))
+        flashcard_work = priority.due_flashcards + priority.new_flashcards
+        question_work = priority.wrong_questions + priority.unanswered_questions
         return "questions" if question_work > flashcard_work else "flashcards"
 
     def _date(self, value: object) -> str:
@@ -453,3 +476,4 @@ class HomePage(QWidget):
                 item.widget().deleteLater()
             elif item.layout():
                 self._clear_layout(item.layout())
+

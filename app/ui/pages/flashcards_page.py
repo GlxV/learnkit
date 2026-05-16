@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
+from app.application.query_services.study_session_query_service import StudySessionQueryService
+from app.application.query_services.ui_data_provider import UIBlock, UIDataProvider, UIModule, UISubject
+from app.application.use_cases.review_flashcard import ReviewFlashcardUseCase
 from app.core.models.flashcard import Flashcard
 from app.core.models.study_block import StudyBlock
-from app.core.services.progress_service import ProgressService
 from app.core.storage.local_storage import LocalStorage
 from app.ui.components.cards import EmptyState, FlashcardViewer, ProgressLine, label
 from app.ui.feedback import log_action, show_toast
-from app.ui.mock_data import UIBlock, UIDataProvider, UIModule, UISubject
 from app.ui.pages.base import panel, scroll_page
 
 
@@ -16,8 +17,8 @@ class FlashcardsPage(QWidget):
     def __init__(self, provider: UIDataProvider, storage: LocalStorage) -> None:
         super().__init__()
         self.provider = provider
-        self.storage = storage
-        self.progress_service = ProgressService(storage)
+        self.study_session_query_service = StudySessionQueryService(storage)
+        self.review_flashcard_use_case = ReviewFlashcardUseCase(storage)
         self.subjects = provider.subjects()
         self.current_block: StudyBlock | None = None
         self.cards: list[Flashcard] = []
@@ -86,16 +87,16 @@ class FlashcardsPage(QWidget):
 
     def select_block_by_id(self, block_id: str) -> None:
         self.refresh()
-        _, module, block = self.storage.get_block_by_id(block_id)
-        subject = next((item for item in self.subjects if any(mod.id == module.id for mod in item.modules)), None)
+        context = self.study_session_query_service.block_context(block_id)
+        subject = next((item for item in self.subjects if item.name == context.subject.name), None)
         if subject:
             subject_index = self.subject_combo.findText(subject.name)
             if subject_index >= 0:
                 self.subject_combo.setCurrentIndex(subject_index)
-        module_index = self.module_combo.findText(module.name)
+        module_index = self.module_combo.findText(context.module.name)
         if module_index >= 0:
             self.module_combo.setCurrentIndex(module_index)
-        block_index = self.block_combo.findData(block.id)
+        block_index = self.block_combo.findData(context.block.id)
         if block_index >= 0:
             self.block_combo.setCurrentIndex(block_index)
 
@@ -119,14 +120,11 @@ class FlashcardsPage(QWidget):
         block_id = self.block_combo.currentData()
         if not block_id:
             return
-        _, _, block = self.storage.get_block_by_id(block_id)
-        self.current_block = block
-        self.cards = block.flashcards
+        session = self.study_session_query_service.flashcard_session(str(block_id))
+        self.current_block = session.block
+        self.cards = session.cards
         self.current_index = 0
-        self.session_queue = [
-            int(item["index"])
-            for item in self.progress_service.get_flashcard_queue(block.id)
-        ]
+        self.session_queue = [int(item["index"]) for item in session.queue]
         self.queue_position = 0
         self._render_session()
 
@@ -200,8 +198,9 @@ class FlashcardsPage(QWidget):
         right.setFixedWidth(280)
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(16, 16, 16, 16)
-        progress = self.progress_service.get_block_progress(self.current_block.id)
-        queue_info = self.progress_service.get_flashcard_queue(self.current_block.id)
+        session = self.study_session_query_service.flashcard_session(self.current_block.id)
+        progress = session.progress
+        queue_info = session.queue
         due_count = len([item for item in queue_info if item["state"] == "due"])
         new_count = len([item for item in queue_info if item["state"] == "new"])
         future_count = len([item for item in queue_info if item["state"] == "future"])
@@ -239,7 +238,7 @@ class FlashcardsPage(QWidget):
             return
         card = self.cards[self.current_index]
         if status != "skipped":
-            self.progress_service.record_flashcard(self.current_block.id, card.id, status)
+            self.review_flashcard_use_case.execute(self.current_block.id, card.id, status)
         labels = {
             "again": "Repetir",
             "hard": "Difícil",
@@ -254,7 +253,8 @@ class FlashcardsPage(QWidget):
     def _fresh_queue_indices(self) -> list[int]:
         if not self.current_block:
             return []
-        return [int(item["index"]) for item in self.progress_service.get_flashcard_queue(self.current_block.id)]
+        session = self.study_session_query_service.flashcard_session(self.current_block.id)
+        return [int(item["index"]) for item in session.queue]
 
     def _previous(self) -> None:
         if self.session_queue:
@@ -295,3 +295,4 @@ class FlashcardsPage(QWidget):
                 item.widget().deleteLater()
             elif item.layout():
                 self._clear_layout(item.layout())
+

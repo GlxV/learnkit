@@ -17,13 +17,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.core.services.block_service import BlockService
-from app.core.services.progress_service import ProgressService
+from app.application.query_services.study_session_query_service import StudySessionQueryService
+from app.application.query_services.ui_data_provider import UIBlock, UIDataProvider, UIModule, UISubject
+from app.application.use_cases.manage_study_summary import ManageStudySummaryUseCase
 from app.core.storage.local_storage import LocalStorage
 from app.ui.components.cards import EmptyState, ProgressLine, StatCard, StudyBlockRow, label
 from app.ui.components.summary_visual import PresentationDialog, VisualSummaryWidget
 from app.ui.feedback import log_action, show_toast
-from app.ui.mock_data import UIBlock, UIDataProvider, UIModule, UISubject
 from app.ui.pages.base import panel, scroll_page
 from app.ui.theme import COLORS
 
@@ -111,10 +111,18 @@ class SummaryEditDialog(QDialog):
 
 
 class SummaryDialog(QDialog):
-    def __init__(self, storage: LocalStorage, block_id: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        study_session_query_service: StudySessionQueryService,
+        summary_use_case: ManageStudySummaryUseCase,
+        block_id: str,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
-        self.storage = storage
-        self.subject, self.module, self.block = self.storage.get_block_by_id(block_id)
+        self.study_session_query_service = study_session_query_service
+        self.summary_use_case = summary_use_case
+        context = self.study_session_query_service.block_context(block_id)
+        self.subject, self.module, self.block = context.subject, context.module, context.block
         self.setWindowTitle(f"Resumo - {self.block.title}")
         self.resize(980, 720)
         layout = QVBoxLayout(self)
@@ -170,11 +178,7 @@ class SummaryDialog(QDialog):
         self.visual_button.setChecked(normalized == "visual")
         self.presentation.setVisible(normalized == "visual")
         if save:
-            subject, module, block = self.storage.get_block_by_id(self.block.id)
-            block.preferred_summary_mode = normalized
-            block.touch()
-            self.storage.save_block(subject, module, block)
-            self.block = block
+            self.block = self.summary_use_case.set_preferred_mode(self.block.id, normalized)
 
     def _copy_current(self) -> None:
         if self.stack.currentWidget() is self.visual_viewer:
@@ -198,7 +202,7 @@ class SummaryDialog(QDialog):
             return
         summary_text, summary_visual, preferred = dialog.values()
         try:
-            updated = BlockService(self.storage).update_summary_modes(
+            updated = self.summary_use_case.update_summary(
                 self.block.id,
                 summary_markdown=summary_text,
                 summary_visual=summary_visual,
@@ -213,7 +217,8 @@ class SummaryDialog(QDialog):
         log_action("summary_edited", block_id=self.block.id, preferred=self.block.preferred_summary_mode)
 
     def _reload_views(self) -> None:
-        self.subject, self.module, self.block = self.storage.get_block_by_id(self.block.id)
+        context = self.study_session_query_service.block_context(self.block.id)
+        self.subject, self.module, self.block = context.subject, context.module, context.block
         markdown = self.block.summary.content if self.block.summary else ""
         self.text_viewer.setMarkdown(markdown or "Este bloco ainda não possui resumo importado.")
         self.stack.removeWidget(self.visual_viewer)
@@ -230,8 +235,8 @@ class StudiesPage(QWidget):
     def __init__(self, provider: UIDataProvider, storage: LocalStorage) -> None:
         super().__init__()
         self.provider = provider
-        self.storage = storage
-        self.progress_service = ProgressService(storage)
+        self.study_session_query_service = StudySessionQueryService(storage)
+        self.summary_use_case = ManageStudySummaryUseCase(storage)
         self.subjects: list[UISubject] = []
         self.subject_combo: QComboBox | None = None
         self.module_combo: QComboBox | None = None
@@ -406,7 +411,7 @@ class StudiesPage(QWidget):
 
     def _record_and_open(self, block: UIBlock) -> None:
         if block.id:
-            self.progress_service.record_access(block.id)
+            self.study_session_query_service.record_access(block.id)
             log_action("block_accessed", block_id=block.id)
         self._show_summary(block)
 
@@ -414,9 +419,14 @@ class StudiesPage(QWidget):
         if not block.id:
             QMessageBox.information(self, "Resumo", "Este bloco ainda nao esta salvo no storage real.")
             return
-        _, _, stored_block = self.storage.get_block_by_id(block.id)
-        show_toast(self, f"Abrindo resumo: {stored_block.title}", "info")
-        SummaryDialog(self.storage, stored_block.id, self).exec()
+        context = self.study_session_query_service.block_context(block.id)
+        show_toast(self, f"Abrindo resumo: {context.block.title}", "info")
+        SummaryDialog(
+            self.study_session_query_service,
+            self.summary_use_case,
+            context.block.id,
+            self,
+        ).exec()
 
     def _selected_subject(self) -> UISubject | None:
         if self.subject_combo is None:
