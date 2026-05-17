@@ -11,6 +11,7 @@ from app.core.storage.local_storage import LocalStorage
 from app.ui.components.cards import EmptyState, FlashcardViewer, ProgressLine, label
 from app.ui.feedback import log_action, show_toast
 from app.ui.pages.base import panel, scroll_page
+from app.ui.theme import COLORS
 
 
 class FlashcardsPage(QWidget):
@@ -179,11 +180,11 @@ class FlashcardsPage(QWidget):
             if style == "primary":
                 button.setObjectName("PrimaryButton")
             elif style == "warning":
-                button.setStyleSheet("border-color: #F59E0B; color: #F59E0B;")
+                button.setStyleSheet(f"border-color: {COLORS['amber']}; color: {COLORS['amber']};")
             elif style == "danger":
-                button.setStyleSheet("border-color: #EF4444; color: #EF4444;")
+                button.setStyleSheet(f"border-color: {COLORS['red']}; color: {COLORS['red']};")
             elif style == "good":
-                button.setStyleSheet("border-color: #22C55E; color: #22C55E;")
+                button.setStyleSheet(f"border-color: {COLORS['green']}; color: {COLORS['green']};")
             button.clicked.connect(handler)
             controls.addWidget(button)
         center.addLayout(controls)

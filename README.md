@@ -176,6 +176,26 @@ Também existe o atalho Windows:
 .\abrir_learnkit.bat
 ```
 
+## Atualizações
+
+O auto-updater usa GitHub Releases estáveis do repo `GlxV/learnkit`.
+
+No modo de desenvolvimento (`python -m app.main`), a atualização automática fica
+desativada e a tela de Configurações oferece apenas acesso manual às releases.
+O fluxo de um clique fica habilitado somente em builds Windows empacotados com
+PyInstaller `onedir`, contendo `LearnKit.exe` e `LearnKitUpdater.exe`.
+
+Uma release instalável precisa publicar:
+
+- `LearnKit-<versao>-win.zip`;
+- `latest.json` ou `manifest.json` com `version`, `platform`, `asset_name`,
+  `sha256`, `release_url` e `notes` opcional.
+
+Sem manifest válido com SHA-256, o app mostra a release como manual-only e não
+habilita `Update now`.
+
+Mais detalhes: `docs/release.md`.
+
 ## Fluxo principal
 
 1. Abra `Importação/IA`.
@@ -225,7 +245,9 @@ Se a IA enviar apenas `RESUMO_TEXTO`, o app salva o resumo simples. Se enviar `R
 
 ## Tela Banco de Dados
 
-A UI tem uma página `Banco de Dados` para demonstrar persistência.
+A UI tem uma página `Banco de Dados` para demonstrar persistência. Ela fica
+oculta por padrão e aparece na sidebar somente quando `Modo desenvolvedor` está
+ativado em Configurações.
 
 Ela mostra:
 
@@ -282,6 +304,7 @@ python -m pytest -q
 
 ```text
 app/
+  application/       # Casos de uso, query services e DTOs
   core/
     database/        # SQLiteStorage
     extractors/      # PDF/PPTX/DOCX/TXT/MD/código + OCR opcional
@@ -290,6 +313,7 @@ app/
     prompt/          # Gerador de prompt
     services/        # Casos de uso do core
     storage/         # Storage JSON legado/compatibilidade
+  infrastructure/    # GitHub Releases, update, SQLite repos/queries
   cli/               # CLI temporária
   ui/                # UI desktop PySide6
 data/

@@ -55,10 +55,10 @@ class ProgressPage(QWidget):
         cards = QGridLayout()
         cards.setHorizontalSpacing(12)
         top_cards = [
-            StatCard("Progresso geral", f"{stats.progress_percent}%", "cards + perguntas", "activity", COLORS["blue"]),
-            StatCard("Pendências", str(summary.pending_reviews), "revisar agora", "progress", COLORS["purple_soft"]),
+            StatCard("Progresso geral", f"{stats.progress_percent}%", "cards + perguntas", "activity", COLORS["accent"]),
+            StatCard("Pendências", str(summary.pending_reviews), "revisar agora", "progress", COLORS["accent_hover"]),
             StatCard("Cards vencidos", str(summary.due_flashcards), "fila de revisão", "flashcards", COLORS["amber"]),
-            StatCard("Perguntas erradas", str(summary.wrong_questions), "corrigir depois", "questions", "#EC4899"),
+            StatCard("Perguntas erradas", str(summary.wrong_questions), "corrigir depois", "questions", COLORS["red"]),
             StatCard("Atividade", str(len(dashboard.activity)), "eventos recentes", "activity", COLORS["green"]),
         ]
         for index, card in enumerate(top_cards):
@@ -145,9 +145,9 @@ class ProgressPage(QWidget):
         layout.addWidget(label("Fila de revisão", "SectionTitle"))
         rows = [
             ("Cards vencidos", summary.due_flashcards, COLORS["amber"], "flashcards"),
-            ("Cards novos", summary.new_flashcards, COLORS["blue"], "flashcards"),
-            ("Perguntas erradas", summary.wrong_questions, "#EC4899", "questions"),
-            ("Perguntas em branco", summary.unanswered_questions, COLORS["purple_soft"], "questions"),
+            ("Cards novos", summary.new_flashcards, COLORS["accent"], "flashcards"),
+            ("Perguntas erradas", summary.wrong_questions, COLORS["red"], "questions"),
+            ("Perguntas em branco", summary.unanswered_questions, COLORS["accent_hover"], "questions"),
         ]
         for title, value, color, destination in rows:
             row = QHBoxLayout()

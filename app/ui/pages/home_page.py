@@ -121,11 +121,11 @@ class HomePage(QWidget):
         stats = QGridLayout()
         stats.setHorizontalSpacing(12)
         cards = [
-            StatCard("Matérias", str(stats_data.total_subjects), "dados locais", "subjects", COLORS["blue"]),
-            StatCard("Módulos", str(stats_data.total_modules), "criados por você", "activity", COLORS["purple_soft"]),
-            StatCard("Pendências", str(summary.pending_reviews), "revisar agora", "progress", "#22D3EE"),
+            StatCard("Matérias", str(stats_data.total_subjects), "dados locais", "subjects", COLORS["accent"]),
+            StatCard("Módulos", str(stats_data.total_modules), "criados por você", "activity", COLORS["accent_hover"]),
+            StatCard("Pendências", str(summary.pending_reviews), "revisar agora", "progress", COLORS["success"]),
             StatCard("Flashcards", str(stats_data.total_flashcards), f"{summary.due_flashcards} vencidos", "flashcards", COLORS["amber"]),
-            StatCard("Perguntas", str(stats_data.total_questions), f"{summary.wrong_questions} erradas", "questions", "#EC4899"),
+            StatCard("Perguntas", str(stats_data.total_questions), f"{summary.wrong_questions} erradas", "questions", COLORS["red"]),
         ]
         for index, card in enumerate(cards):
             stats.addWidget(card, 0, index)
@@ -168,9 +168,9 @@ class HomePage(QWidget):
         preview.setFixedSize(108, 98)
         preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         preview.setStyleSheet(
-            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
-            f"stop:0 {COLORS['purple']}, stop:1 #312E81); "
-            "border-radius: 12px; font-size: 18px; font-weight: 850; color: white;"
+            f"background: {COLORS['accent_dark']}; "
+            f"border: 1px solid {COLORS['accent']}; "
+            f"border-radius: 12px; font-size: 18px; font-weight: 850; color: {COLORS['text']};"
         )
         row.addWidget(preview)
 
@@ -254,7 +254,7 @@ class HomePage(QWidget):
             return card
         for module in modules:
             row = QHBoxLayout()
-            badge = IconBadge("M", COLORS["purple"], size=42, radius=10, font_size=14)
+            badge = IconBadge("M", COLORS["accent_active"], size=42, radius=10, font_size=14)
             text = QVBoxLayout()
             text.addWidget(label(module.name, "SmallTitle"))
             text.addWidget(label(f"{len(module.blocks)} blocos", "Weak"))
@@ -340,9 +340,9 @@ class HomePage(QWidget):
         layout.addWidget(label("Revisar agora", "SectionTitle"))
         items = [
             ("Cards vencidos", summary.due_flashcards, "flashcards", COLORS["amber"]),
-            ("Cards novos", summary.new_flashcards, "flashcards", COLORS["blue"]),
-            ("Perguntas erradas", summary.wrong_questions, "questions", "#EC4899"),
-            ("Perguntas em branco", summary.unanswered_questions, "questions", COLORS["purple_soft"]),
+            ("Cards novos", summary.new_flashcards, "flashcards", COLORS["accent"]),
+            ("Perguntas erradas", summary.wrong_questions, "questions", COLORS["red"]),
+            ("Perguntas em branco", summary.unanswered_questions, "questions", COLORS["accent_hover"]),
         ]
         for title, count, destination, color in items:
             row = QHBoxLayout()

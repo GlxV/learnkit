@@ -78,11 +78,11 @@ class Toast(QFrame):
             "success": COLORS["green"],
             "error": COLORS["red"],
             "warning": COLORS["amber"],
-            "info": COLORS["blue"],
-        }.get(kind, COLORS["blue"])
+            "info": COLORS["accent"],
+        }.get(kind, COLORS["accent"])
         return (
             "QFrame#Toast {"
-            "background: #0B1626;"
+            f"background: {COLORS['card']};"
             f"border: 1px solid {color};"
             "border-radius: 12px;"
             "}"

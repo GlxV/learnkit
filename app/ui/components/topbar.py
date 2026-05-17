@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QCompleter, QFrame, QHBoxLayout, QLineEdit
 from app.ui.components.icons import LineIcon
 from app.ui.components.subject_selector import SubjectSelector
 from app.application.query_services.ui_data_provider import UISubject
+from app.ui.theme import COLORS
 
 
 class TopBar(QFrame):
@@ -27,7 +28,7 @@ class TopBar(QFrame):
         search_layout = QHBoxLayout(search_box)
         search_layout.setContentsMargins(14, 0, 14, 0)
         search_layout.setSpacing(10)
-        search_layout.addWidget(LineIcon("search", "#9BA8BA", 22))
+        search_layout.addWidget(LineIcon("search", COLORS["muted"], 22))
         self.search = QLineEdit()
         self.search.setObjectName("SearchInput")
         self.search.setPlaceholderText("Buscar matérias, módulos, blocos ou perguntas...")

@@ -19,7 +19,7 @@ class OpenSourcePanel(QFrame):
         mark.setFixedSize(34, 34)
         mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
         mark.setStyleSheet(
-            f"background: rgba(124, 58, 237, 0.18); color: {COLORS['purple_soft']}; "
+            f"background: {COLORS['accent_dark']}; color: {COLORS['accent_hover']}; "
             "border-radius: 10px; font-weight: 900;"
         )
         title = QLabel("Feito com codigo aberto")

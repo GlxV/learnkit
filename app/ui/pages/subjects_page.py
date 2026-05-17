@@ -48,7 +48,7 @@ class IconChoiceButton(QPushButton):
     def set_active(self, active: bool, accent_color: str) -> None:
         self.setChecked(active)
         self.setIcon(self._icon("#FFFFFF" if active else COLORS["muted"]))
-        background = "rgba(124, 58, 237, 0.30)" if active else "#07111F"
+        background = COLORS["accent_dark"] if active else COLORS["surface"]
         border = accent_color if active else COLORS["border"]
         self.setStyleSheet(
             f"""
@@ -59,11 +59,11 @@ class IconChoiceButton(QPushButton):
                 padding: 0;
             }}
             QPushButton:hover {{
-                background: #101B31;
+                background: {COLORS["card_hover"]};
                 border-color: {accent_color};
             }}
             QPushButton:pressed {{
-                background: #0B1424;
+                background: {COLORS["card_alt"]};
             }}
             """
         )
@@ -78,7 +78,7 @@ class IconChoiceButton(QPushButton):
 
 
 class NewSubjectDialog(QDialog):
-    COLORS = ["#3B82F6", "#7C3AED", "#16A34A", "#D97706", "#EC4899", "#06B6D4"]
+    COLORS = ["#6FA36B", "#85BF7E", "#5F8F68", "#C9A86A", "#D17A7A", "#748077"]
     ICONS = SUBJECT_ICONS
     MODULES = MODULE_PRESETS
 
@@ -111,11 +111,10 @@ class NewSubjectDialog(QDialog):
         content = QWidget()
         content.setObjectName("NewSubjectDialogContent")
         content.setStyleSheet(
-            """
-            QWidget#NewSubjectDialogContent {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #050B14, stop:0.55 #07111F, stop:1 #050B14);
-            }
+            f"""
+            QWidget#NewSubjectDialogContent {{
+                background: {COLORS["background"]};
+            }}
             """
         )
         layout = QVBoxLayout(content)
@@ -166,7 +165,7 @@ class NewSubjectDialog(QDialog):
         self.color_preview.setFixedSize(42, 42)
         self.color_preview.clicked.connect(self._choose_color)
         self.hex_color = QLineEdit(self.selected_color)
-        self.hex_color.setPlaceholderText("#3B82F6")
+        self.hex_color.setPlaceholderText(COLORS["accent"])
         self.hex_color.setMaxLength(7)
         self.hex_color.editingFinished.connect(self._apply_hex_color_from_input)
         choose_color = QPushButton("Escolher cor")
@@ -339,7 +338,7 @@ class NewSubjectDialog(QDialog):
         normalized = self._normalized_hex(value)
         if normalized is None:
             self.hex_color.setStyleSheet(f"border-color: {COLORS['red']};")
-            self.color_help.setText("Use um HEX valido, por exemplo #3B82F6.")
+            self.color_help.setText(f"Use um HEX valido, por exemplo {COLORS['accent']}.")
             self.color_help.setStyleSheet(f"color: {COLORS['red']}; font-size: 12px;")
             if show_error:
                 show_toast(self, "Informe uma cor HEX valida.", "warning")
@@ -590,7 +589,7 @@ class SubjectsPage(QWidget):
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(10)
         header = QHBoxLayout()
-        header.addWidget(IconBadge("blocks", self.selected_subject.color if self.selected_subject else COLORS["purple"], size=38, radius=10))
+        header.addWidget(IconBadge("blocks", self.selected_subject.color if self.selected_subject else COLORS["accent"], size=38, radius=10))
         title_box = QVBoxLayout()
         title_box.addWidget(label(module.name, "SmallTitle"))
         title_box.addWidget(label(f"{len(module.blocks)} blocos", "Weak"))

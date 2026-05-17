@@ -8,6 +8,7 @@ class NavItem:
     key: str
     label: str
     icon: str
+    developer_only: bool = False
 
 
 NAV_ITEMS = [
@@ -17,7 +18,11 @@ NAV_ITEMS = [
     NavItem("flashcards", "Flashcards", "flashcards"),
     NavItem("questions", "Perguntas", "questions"),
     NavItem("progress", "Progresso", "progress"),
-    NavItem("database", "Banco de Dados", "database"),
+    NavItem("database", "Banco de Dados", "database", developer_only=True),
     NavItem("import", "Importação/IA", "import"),
     NavItem("settings", "Configurações", "settings"),
 ]
+
+
+def visible_nav_items(developer_mode: bool = False) -> list[NavItem]:
+    return [item for item in NAV_ITEMS if developer_mode or not item.developer_only]
