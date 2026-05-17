@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
     QAbstractButton,
     QApplication,
@@ -37,6 +37,7 @@ from app.ui.pages.settings_page import SettingsPage
 from app.ui.pages.studies_page import StudiesPage
 from app.ui.pages.subjects_page import SubjectsPage
 from app.ui.theme import apply_app_theme_settings, polish_combo_box
+from app.ui.update_controller import UpdateController
 
 
 class SearchResultsDialog(QDialog):
@@ -87,7 +88,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("LearnKit")
         self.resize(1440, 900)
         self.storage = SQLiteStorage("data/learnkit.db")
+        self.settings = self._load_settings()
         self._apply_saved_theme()
+        self.developer_mode = bool(self.settings.get("developer_mode", False))
         self.provider = UIDataProvider(self.storage)
         self.search_query_service = SearchQueryService(self.storage)
         self.subjects = self.provider.subjects()
@@ -102,7 +105,7 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        self.sidebar = Sidebar()
+        self.sidebar = Sidebar(developer_mode=self.developer_mode)
         self.sidebar.page_selected.connect(self.navigate)
         root.addWidget(self.sidebar)
 
@@ -121,6 +124,9 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self.stack, 1)
         root.addWidget(content, 1)
 
+        settings_page = SettingsPage(self.storage)
+        settings_page.settings_saved.connect(self._apply_saved_settings)
+        self.update_controller = UpdateController(self, settings_page)
         self.pages = {
             "home": HomePage(self.provider),
             "subjects": SubjectsPage(self.provider),
@@ -130,13 +136,14 @@ class MainWindow(QMainWindow):
             "progress": ProgressPage(self.provider, self.storage),
             "database": DatabasePage(self.storage),
             "import": ImportPage(self.subjects, self.storage),
-            "settings": SettingsPage(self.storage),
+            "settings": settings_page,
         }
         for page in self.pages.values():
             self.stack.addWidget(page)
         self.toast = Toast(self)
         self.statusBar().showMessage("LearnKit pronto.", 2500)
         self.navigate("home")
+        QTimer.singleShot(1500, self.update_controller.check_on_startup)
 
     def show_toast(self, message: str, kind: str = "info") -> None:
         log_action("toast", kind=kind, message=message)
@@ -147,6 +154,9 @@ class MainWindow(QMainWindow):
         return QMessageBox.question(self, title, message) == QMessageBox.StandardButton.Yes
 
     def navigate(self, key: str) -> None:
+        if key == "database" and not self.developer_mode:
+            self.show_toast("Ative o Modo desenvolvedor nas ConfiguraÃ§Ãµes para abrir Banco de Dados.", "warning")
+            return
         self.subjects = self.provider.subjects()
         self.topbar.refresh_subjects(self.subjects)
         page = self.pages.get(key)
@@ -256,16 +266,26 @@ class MainWindow(QMainWindow):
             combo.view().setCursor(Qt.CursorShape.PointingHandCursor)
             polish_combo_box(combo)
 
-    def _apply_saved_theme(self) -> None:
+    def _load_settings(self) -> dict[str, object]:
         settings_path = self.storage.base_path / "settings.json"
         if not settings_path.exists():
-            return
+            return {}
         try:
             settings = json.loads(settings_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
-            return
-        if isinstance(settings, dict):
+            return {}
+        return settings if isinstance(settings, dict) else {}
+
+    def _apply_saved_settings(self, settings: object) -> None:
+        self.settings = dict(settings) if isinstance(settings, dict) else {}
+        self.developer_mode = bool(self.settings.get("developer_mode", False))
+        self.sidebar.set_developer_mode(self.developer_mode)
+        if not self.developer_mode and self.stack.currentWidget() is self.pages.get("database"):
+            self.navigate("settings")
+
+    def _apply_saved_theme(self) -> None:
+        if self.settings:
             app = QApplication.instance()
             if app is not None:
-                apply_app_theme_settings(app, settings)
+                apply_app_theme_settings(app, self.settings)
 

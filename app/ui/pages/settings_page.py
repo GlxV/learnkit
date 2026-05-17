@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -19,15 +20,21 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.version import __version__
 from app.core.services.backup_service import BackupService
 from app.core.storage.local_storage import LocalStorage
+from app.infrastructure.update.runtime_environment import is_packaged
 from app.ui.components.cards import label
 from app.ui.feedback import confirm_action, log_action, show_toast
 from app.ui.pages.base import panel, scroll_page
-from app.ui.theme import THEME_PRESETS, apply_app_theme_settings
+from app.ui.theme import COLORS, THEME_PRESETS, apply_app_theme_settings
 
 
 class SettingsPage(QWidget):
+    settings_saved = Signal(object)
+    update_check_requested = Signal()
+    open_releases_requested = Signal()
+
     def __init__(self, storage: LocalStorage | None = None) -> None:
         super().__init__()
         self.storage = storage or LocalStorage("data")
@@ -46,8 +53,10 @@ class SettingsPage(QWidget):
         self.layout.addWidget(label("Preferências locais, temas e armazenamento. Sem API paga ou cloud.", "Muted"))
 
         self._build_appearance()
+        self._build_update_settings()
         self._build_study_settings()
         self._build_storage_settings()
+        self._build_developer_settings()
         self._build_shortcuts()
 
         actions = QHBoxLayout()
@@ -62,6 +71,7 @@ class SettingsPage(QWidget):
         self.layout.addLayout(actions)
         self.layout.addStretch()
         self._apply_loaded_values()
+        self.developer_mode.toggled.connect(self._save_developer_mode)
 
     def _build_appearance(self) -> None:
         appearance = panel()
@@ -93,7 +103,7 @@ class SettingsPage(QWidget):
             ("secondary", "Destaque secundario"),
         ]:
             field = QLineEdit()
-            field.setPlaceholderText("#0B1626")
+            field.setPlaceholderText(COLORS["card"])
             field.textChanged.connect(self._update_theme_preview)
             self.custom_fields[key] = field
             form.addRow(title, field)
@@ -102,6 +112,38 @@ class SettingsPage(QWidget):
         self.theme_preview.setMinimumHeight(56)
         form.addRow("Preview", self.theme_preview)
         self.layout.addWidget(appearance)
+
+    def _build_update_settings(self) -> None:
+        updates = panel()
+        layout = QVBoxLayout(updates)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(8)
+        layout.addWidget(label("Atualizacoes", "SectionTitle"))
+
+        self.update_version = label(f"Versao atual: {__version__}", "Muted")
+        layout.addWidget(self.update_version)
+
+        initial_status = (
+            "Atualizacao automatica so esta disponivel em builds empacotados."
+            if not is_packaged()
+            else "Nenhuma verificacao feita nesta sessao."
+        )
+        self.update_status = label(initial_status, "Muted")
+        self.update_status.setWordWrap(True)
+        layout.addWidget(self.update_status)
+
+        actions = QHBoxLayout()
+        self.check_updates_button = QPushButton("Verificar atualizacoes")
+        self.check_updates_button.setObjectName("PrimaryButton")
+        self.check_updates_button.clicked.connect(self.update_check_requested.emit)
+        self.open_releases_button = QPushButton("Abrir GitHub Releases")
+        self.open_releases_button.clicked.connect(self.open_releases_requested.emit)
+        actions.addWidget(self.check_updates_button)
+        actions.addWidget(self.open_releases_button)
+        actions.addStretch()
+        layout.addLayout(actions)
+
+        self.layout.addWidget(updates)
 
     def _build_study_settings(self) -> None:
         studies = panel()
@@ -155,6 +197,19 @@ class SettingsPage(QWidget):
         storage_form.addRow("Backup manual", backup_now)
         self.layout.addWidget(storage)
 
+    def _build_developer_settings(self) -> None:
+        developer = panel()
+        layout = QVBoxLayout(developer)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(8)
+        layout.addWidget(label("Modo desenvolvedor", "SectionTitle"))
+        description = label("Mostra ferramentas técnicas, como a página Banco de Dados.", "Muted")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+        self.developer_mode = QCheckBox("Ativar modo desenvolvedor")
+        layout.addWidget(self.developer_mode)
+        self.layout.addWidget(developer)
+
     def _build_shortcuts(self) -> None:
         shortcuts = panel()
         form = QFormLayout(shortcuts)
@@ -176,7 +231,7 @@ class SettingsPage(QWidget):
         self.layout.addWidget(shortcuts)
 
     def _apply_loaded_values(self) -> None:
-        self._set_combo(self.theme_preset, str(self.settings.get("theme_preset", "LearnKit Dark")))
+        self._set_combo(self.theme_preset, str(self.settings.get("theme_preset", "Graphite Green")))
         self._set_combo(self.density, str(self.settings.get("density", "Confortável")))
         self._set_combo(self.question_order, str(self.settings.get("question_order", "Ordem original")))
         self.animations.setChecked(bool(self.settings.get("animations", True)))
@@ -185,6 +240,9 @@ class SettingsPage(QWidget):
         self.show_explanations.setChecked(bool(self.settings.get("show_explanations_first", False)))
         self.confirm_exit.setChecked(bool(self.settings.get("confirm_exit_exam", True)))
         self.backup_auto.setChecked(bool(self.settings.get("backup_auto", False)))
+        self.developer_mode.blockSignals(True)
+        self.developer_mode.setChecked(bool(self.settings.get("developer_mode", False)))
+        self.developer_mode.blockSignals(False)
         self.data_path.setText(str(self.settings.get("data_path", self.storage.base_path)))
 
         custom = self.settings.get("custom_theme")
@@ -222,6 +280,7 @@ class SettingsPage(QWidget):
             "confirm_exit_exam": self.confirm_exit.isChecked(),
             "data_path": self.data_path.text().strip() or str(self.storage.base_path),
             "backup_auto": self.backup_auto.isChecked(),
+            "developer_mode": self.developer_mode.isChecked(),
             "shortcuts": {name: field.text().strip() for name, field in self.shortcut_fields.items()},
         }
 
@@ -229,11 +288,27 @@ class SettingsPage(QWidget):
         self.settings = self._collect_settings()
         target_data_path = Path(str(self.settings["data_path"]))
         target_data_path.mkdir(parents=True, exist_ok=True)
-        self.settings_path.parent.mkdir(parents=True, exist_ok=True)
-        self.settings_path.write_text(json.dumps(self.settings, ensure_ascii=False, indent=2), encoding="utf-8")
+        self._write_settings(self.settings)
         self._apply_theme_preview()
+        self.settings_saved.emit(dict(self.settings))
         show_toast(self, "Configurações salvas.", "success")
         log_action("settings_saved", path=self.settings_path)
+
+    def _save_developer_mode(self, enabled: bool) -> None:
+        self.settings = dict(self.settings)
+        self.settings["developer_mode"] = bool(enabled)
+        self._write_settings(self.settings)
+        self.settings_saved.emit(dict(self.settings))
+        show_toast(
+            self,
+            "Modo desenvolvedor ativado." if enabled else "Modo desenvolvedor desativado.",
+            "success" if enabled else "info",
+        )
+        log_action("developer_mode_changed", enabled=enabled)
+
+    def _write_settings(self, settings: dict[str, object]) -> None:
+        self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+        self.settings_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def _apply_theme_preview(self) -> None:
         settings = self._collect_settings()
@@ -248,10 +323,10 @@ class SettingsPage(QWidget):
         card = self.custom_fields.get("card")
         text = self.custom_fields.get("text")
         muted = self.custom_fields.get("muted")
-        accent_value = accent.text().strip() if accent else "#3B82F6"
-        card_value = card.text().strip() if card else "#0B1626"
-        text_value = text.text().strip() if text else "#F3F6FB"
-        muted_value = muted.text().strip() if muted else "#9BA8BA"
+        accent_value = accent.text().strip() if accent else COLORS["accent"]
+        card_value = card.text().strip() if card else COLORS["card"]
+        text_value = text.text().strip() if text else COLORS["text"]
+        muted_value = muted.text().strip() if muted else COLORS["muted"]
         self.theme_preview.setText("Cards, bordas, texto e destaque usam estes valores ao aplicar.")
         self.theme_preview.setStyleSheet(
             f"background: {card_value}; color: {text_value}; border: 1px solid {accent_value}; "
@@ -333,3 +408,14 @@ class SettingsPage(QWidget):
         index = combo.findText(value)
         if index >= 0:
             combo.setCurrentIndex(index)
+
+    def set_update_status(self, text: str) -> None:
+        self.update_status.setText(text)
+
+    def set_update_check_running(self, running: bool) -> None:
+        self.check_updates_button.setEnabled(not running)
+        self.check_updates_button.setText(
+            "Verificando..."
+            if running
+            else "Verificar atualizacoes"
+        )

@@ -5,10 +5,14 @@ venv/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
 data/*
 !data/.gitkeep
 app/logs/*.log
 exports/
+build/
+dist/
+*.spec
 materialteste/
 tmp_ocr_variants/
 tmp_ocr_test.png

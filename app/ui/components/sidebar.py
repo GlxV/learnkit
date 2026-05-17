@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QToolBut
 
 from app.ui.components.icons import LineIcon, LogoMark
 from app.ui.feedback import future_action, log_action
-from app.ui.navigation import NAV_ITEMS, NavItem
+from app.ui.navigation import NAV_ITEMS, NavItem, visible_nav_items
 from app.ui.theme import COLORS
 
 
@@ -29,7 +29,7 @@ class SidebarItem(QFrame):
 
     def set_active(self, active: bool) -> None:
         self.setProperty("active", "true" if active else "false")
-        color = COLORS["purple_soft"] if active else COLORS["muted"]
+        color = COLORS["accent_hover"] if active else COLORS["muted"]
         text_color = COLORS["text"] if active else COLORS["muted"]
         self.icon.set_color(color)
         self.text.setStyleSheet(f"color: {text_color}; font-size: 15px; font-weight: 650;")
@@ -55,7 +55,7 @@ class CollapsibleCommunity(QWidget):
         self.toggle = QToolButton()
         self.toggle.setCheckable(True)
         self.toggle.setStyleSheet(
-            "QToolButton { background: transparent; border: 1px solid #1E2A3D; "
+            f"QToolButton {{ background: transparent; border: 1px solid {COLORS['border']}; "
             "border-radius: 10px; padding: 10px 12px; text-align: left; "
             f"color: {COLORS['text']}; font-size: 15px; }}"
         )
@@ -89,12 +89,13 @@ class CollapsibleCommunity(QWidget):
 class Sidebar(QFrame):
     page_selected = Signal(str)
 
-    def __init__(self) -> None:
+    def __init__(self, developer_mode: bool = False) -> None:
         super().__init__()
         self.setObjectName("Sidebar")
         self.setFixedWidth(260)
         self.items: dict[str, SidebarItem] = {}
         self.collapsed = False
+        self.developer_mode = developer_mode
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 26, 14, 16)
@@ -136,7 +137,20 @@ class Sidebar(QFrame):
         self.footer.setWordWrap(True)
         self.footer.setStyleSheet(f"color: {COLORS['weak']}; font-size: 12px;")
         layout.addWidget(self.footer)
+        self.set_developer_mode(developer_mode)
         self.set_active("home")
+
+    def set_developer_mode(self, enabled: bool) -> None:
+        self.developer_mode = enabled
+        for item in NAV_ITEMS:
+            button = self.items.get(item.key)
+            if button is not None:
+                button.setVisible(enabled or not item.developer_only)
+        if not enabled and "database" in self.items:
+            self.items["database"].set_active(False)
+
+    def visible_item_keys(self) -> list[str]:
+        return [item.key for item in visible_nav_items(self.developer_mode)]
 
     def set_active(self, key: str) -> None:
         for item_key, button in self.items.items():

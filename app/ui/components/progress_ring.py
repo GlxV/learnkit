@@ -23,9 +23,9 @@ class ProgressRing(QWidget):
         painter.drawArc(rect, 0, 360 * 16)
 
         gradient = QConicalGradient(self.rect().center(), -90)
-        gradient.setColorAt(0.0, QColor(COLORS["purple_soft"]))
-        gradient.setColorAt(0.45, QColor(COLORS["blue"]))
-        gradient.setColorAt(1.0, QColor(COLORS["purple_soft"]))
+        gradient.setColorAt(0.0, QColor(COLORS["accent_hover"]))
+        gradient.setColorAt(0.45, QColor(COLORS["accent"]))
+        gradient.setColorAt(1.0, QColor(COLORS["success"]))
         progress_pen = QPen(gradient, 7)
         progress_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(progress_pen)

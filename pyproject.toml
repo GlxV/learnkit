@@ -15,6 +15,9 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
 ]
+build = [
+    "pyinstaller>=6.0.0",
+]
 ocr-windows = [
     "winrt-Windows.Foundation>=3.2.1",
     "winrt-Windows.Foundation.Collections>=3.2.1",
@@ -28,6 +31,10 @@ ocr-windows = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["data*", "exports*", "materialteste*", "tmp_ocr_variants*"]
 
 [tool.ruff]
 line-length = 100

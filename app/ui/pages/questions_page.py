@@ -274,7 +274,7 @@ class QuestionsPage(QWidget):
         self.selected_answer = answer
         for letter, button in self.option_buttons.items():
             button.setStyleSheet(
-                f"border-color: {COLORS['purple_soft']}; background: #182642;"
+                f"border-color: {COLORS['accent']}; background: {COLORS['accent_dark']};"
                 if letter == answer
                 else ""
             )

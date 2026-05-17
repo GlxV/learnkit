@@ -117,8 +117,8 @@ class DropArea(QLabel):
         return [path for path in paths if path.suffix.lower() in self.SUPPORTED_EXTENSIONS]
 
     def _apply_style(self, active: bool) -> None:
-        border = COLORS["blue"] if active else "#2B3B55"
-        background = "rgba(59, 130, 246, 0.10)" if active else "rgba(11, 22, 38, 0.36)"
+        border = COLORS["accent"] if active else COLORS["border"]
+        background = COLORS["accent_dark"] if active else COLORS["card"]
         self.setStyleSheet(
             f"border: 1px dashed {border}; border-radius: 14px; "
             f"padding: 18px; background: {background};"
@@ -450,7 +450,7 @@ class ImportPage(QWidget):
             return
         colors = {
             "pending": COLORS["weak"],
-            "active": COLORS["blue"],
+            "active": COLORS["accent"],
             "done": COLORS["green"],
             "warning": COLORS["amber"],
             "error": COLORS["red"],
@@ -464,7 +464,8 @@ class ImportPage(QWidget):
         }
         color = colors.get(status, COLORS["weak"])
         badge.setStyleSheet(
-            f"background: rgba(59, 130, 246, 0.14); border: 1px solid {color}; "
+            f"background: {COLORS['accent_dark'] if status == 'active' else COLORS['card_alt']}; "
+            f"border: 1px solid {color}; "
             f"border-radius: 15px; color: {color}; font-weight: 800;"
         )
         label_widget.setText(texts.get(status, status))

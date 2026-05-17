@@ -3,22 +3,38 @@ from __future__ import annotations
 from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QListView
 
 
+BASE_THEME_VALUES = {
+    "background": "#101412",
+    "background_alt": "#0D1110",
+    "surface": "#0D1110",
+    "card": "#171C19",
+    "card_alt": "#202721",
+    "card_hover": "#252D27",
+    "border": "#303A34",
+    "border_hover": "#465449",
+    "text": "#E8ECE7",
+    "muted": "#AAB3AA",
+    "weak": "#748077",
+    "accent": "#6FA36B",
+    "accent_hover": "#85BF7E",
+    "accent_active": "#5F8F68",
+    "accent_dark": "#27452D",
+    "warning": "#C9A86A",
+    "error": "#D17A7A",
+    "success": "#7FBF7A",
+    "secondary": "#85BF7E",
+}
+
 COLORS = {
-    "background": "#06101D",
-    "surface": "#081423",
-    "sidebar": "#050D19",
-    "card": "#0D1828",
-    "card_hover": "#121F33",
-    "border": "#223149",
-    "text": "#F3F6FB",
-    "muted": "#9BA8BA",
-    "weak": "#697586",
-    "blue": "#3B82F6",
-    "purple": "#7C3AED",
-    "purple_soft": "#8B5CF6",
-    "green": "#22C55E",
-    "amber": "#F59E0B",
-    "red": "#EF4444",
+    **BASE_THEME_VALUES,
+    "surface_elevated": BASE_THEME_VALUES["card_alt"],
+    "sidebar": BASE_THEME_VALUES["background_alt"],
+    "blue": BASE_THEME_VALUES["accent"],
+    "purple": BASE_THEME_VALUES["accent_active"],
+    "purple_soft": BASE_THEME_VALUES["accent_hover"],
+    "green": BASE_THEME_VALUES["success"],
+    "amber": BASE_THEME_VALUES["warning"],
+    "red": BASE_THEME_VALUES["error"],
 }
 
 SPACING = {
@@ -36,16 +52,23 @@ def apply_app_theme(app: QApplication) -> None:
 
 
 THEME_PRESETS = {
+    "Graphite Green": BASE_THEME_VALUES,
     "LearnKit Dark": {
         "background": "#050B14",
         "background_alt": "#07111F",
         "surface": "#060F1C",
         "card": "#0B1626",
         "card_alt": "#101B2E",
+        "card_hover": "#121F33",
         "border": "#223149",
+        "border_hover": "#3B82F6",
         "text": "#F3F6FB",
         "muted": "#9BA8BA",
+        "weak": "#697586",
         "accent": "#3B82F6",
+        "accent_hover": "#60A5FA",
+        "accent_active": "#2563EB",
+        "accent_dark": "#1D2F55",
         "secondary": "#7C3AED",
     },
     "Midnight Indigo": {
@@ -54,10 +77,16 @@ THEME_PRESETS = {
         "surface": "#090E1E",
         "card": "#10172A",
         "card_alt": "#151F36",
+        "card_hover": "#1B2742",
         "border": "#26314A",
+        "border_hover": "#8B5CF6",
         "text": "#F8FAFC",
         "muted": "#A7B0C2",
+        "weak": "#7D8799",
         "accent": "#8B5CF6",
+        "accent_hover": "#A78BFA",
+        "accent_active": "#7C3AED",
+        "accent_dark": "#312E81",
         "secondary": "#38BDF8",
     },
     "Graphite Focus": {
@@ -66,10 +95,16 @@ THEME_PRESETS = {
         "surface": "#0A0E14",
         "card": "#111827",
         "card_alt": "#172033",
+        "card_hover": "#1F2937",
         "border": "#2A3446",
+        "border_hover": "#64748B",
         "text": "#F4F7FB",
         "muted": "#A3ADBD",
+        "weak": "#7B8494",
         "accent": "#60A5FA",
+        "accent_hover": "#93C5FD",
+        "accent_active": "#3B82F6",
+        "accent_dark": "#1E3A5F",
         "secondary": "#94A3B8",
     },
     "Forest Lab": {
@@ -78,10 +113,16 @@ THEME_PRESETS = {
         "surface": "#061611",
         "card": "#0C211A",
         "card_alt": "#123126",
+        "card_hover": "#173D30",
         "border": "#1F3D33",
+        "border_hover": "#2F6B52",
         "text": "#F1F8F4",
         "muted": "#A4B8AC",
+        "weak": "#789083",
         "accent": "#22C55E",
+        "accent_hover": "#4ADE80",
+        "accent_active": "#16A34A",
+        "accent_dark": "#14532D",
         "secondary": "#14B8A6",
     },
     "Ruby Night": {
@@ -90,10 +131,16 @@ THEME_PRESETS = {
         "surface": "#160912",
         "card": "#24101A",
         "card_alt": "#311625",
+        "card_hover": "#3A1A2C",
         "border": "#4A2335",
+        "border_hover": "#EC4899",
         "text": "#FFF5F8",
         "muted": "#C9A6B5",
+        "weak": "#9B7183",
         "accent": "#EC4899",
+        "accent_hover": "#F472B6",
+        "accent_active": "#DB2777",
+        "accent_dark": "#831843",
         "secondary": "#F97316",
     },
 }
@@ -102,35 +149,64 @@ THEME_PRESETS = {
 def build_theme_styles(settings: dict[str, object] | None = None) -> str:
     values = theme_values(settings)
     style = GLOBAL_STYLES
+    base = BASE_THEME_VALUES
     replacements = {
-        "#050B14": values["background"],
-        "#07111F": values["background_alt"],
-        "#060F1C": values["surface"],
-        "#0B1626": values["card"],
-        "#101B2E": values["card_alt"],
-        "#223149": values["border"],
-        COLORS["text"]: values["text"],
-        COLORS["muted"]: values["muted"],
-        COLORS["blue"]: values["accent"],
-        COLORS["purple"]: values["secondary"],
-        COLORS["purple_soft"]: values["secondary"],
+        base["background"]: values["background"],
+        base["background_alt"]: values["background_alt"],
+        base["surface"]: values["surface"],
+        base["card"]: values["card"],
+        base["card_alt"]: values["card_alt"],
+        base["card_hover"]: values["card_hover"],
+        base["border"]: values["border"],
+        base["border_hover"]: values["border_hover"],
+        base["text"]: values["text"],
+        base["muted"]: values["muted"],
+        base["weak"]: values["weak"],
+        base["accent"]: values["accent"],
+        base["accent_hover"]: values["accent_hover"],
+        base["accent_active"]: values["accent_active"],
+        base["accent_dark"]: values["accent_dark"],
+        base["warning"]: values["warning"],
+        base["error"]: values["error"],
+        base["success"]: values["success"],
     }
     for old, new in replacements.items():
-        style = style.replace(old, str(new))
+        if old != new:
+            style = style.replace(str(old), str(new))
     return style
 
 
 def theme_values(settings: dict[str, object] | None = None) -> dict[str, str]:
     settings = settings or {}
-    preset_name = str(settings.get("theme_preset", settings.get("theme", "LearnKit Dark")))
-    values = dict(THEME_PRESETS.get(preset_name, THEME_PRESETS["LearnKit Dark"]))
+    preset_name = str(settings.get("theme_preset", settings.get("theme", "Graphite Green")))
+    preset = THEME_PRESETS.get(preset_name, THEME_PRESETS["Graphite Green"])
+    values = _complete_theme_values(dict(preset))
     custom = settings.get("custom_theme")
     if isinstance(custom, dict):
         for key in values:
             value = custom.get(key)
             if isinstance(value, str) and value.startswith("#") and len(value) in {4, 7}:
                 values[key] = value
-    return values
+        secondary = custom.get("secondary")
+        if isinstance(secondary, str) and secondary.startswith("#") and len(secondary) in {4, 7}:
+            values["accent_hover"] = secondary
+            values["border_hover"] = secondary
+    return _complete_theme_values(values)
+
+
+def _complete_theme_values(values: dict[str, str]) -> dict[str, str]:
+    complete = dict(BASE_THEME_VALUES)
+    complete.update(values)
+    complete.setdefault("secondary", complete["accent_hover"])
+    complete.setdefault("card_hover", complete["card_alt"])
+    complete.setdefault("border_hover", complete["accent"])
+    complete.setdefault("accent_hover", complete.get("secondary", complete["accent"]))
+    complete.setdefault("accent_active", complete["accent"])
+    complete.setdefault("accent_dark", complete["card_alt"])
+    complete.setdefault("warning", BASE_THEME_VALUES["warning"])
+    complete.setdefault("error", BASE_THEME_VALUES["error"])
+    complete.setdefault("success", BASE_THEME_VALUES["success"])
+    return complete
 
 
 def apply_app_theme_settings(app: QApplication, settings: dict[str, object] | None = None) -> None:
@@ -148,28 +224,28 @@ def polish_combo_box(combo: QComboBox) -> None:
     view.viewport().setAutoFillBackground(True)
     view.window().setStyleSheet("background: transparent; border: 0; margin: 0; padding: 0;")
     view.setStyleSheet(
-        """
-        QListView {
-            background: #0B1626;
-            border: 1px solid #223149;
+        f"""
+        QListView {{
+            background: {COLORS["card"]};
+            border: 1px solid {COLORS["border"]};
             border-radius: 10px;
             padding: 0;
             margin: 0;
             outline: 0;
-        }
-        QListView::item {
+        }}
+        QListView::item {{
             min-height: 34px;
             padding: 8px 10px;
             border: 0;
             margin: 0;
-        }
-        QListView::item:selected {
-            background: #7C3AED;
-            color: #FFFFFF;
-        }
-        QListView::item:hover {
-            background: #12213A;
-        }
+        }}
+        QListView::item:selected {{
+            background: {COLORS["accent_dark"]};
+            color: {COLORS["text"]};
+        }}
+        QListView::item:hover {{
+            background: {COLORS["card_hover"]};
+        }}
         """
     )
 
@@ -182,69 +258,49 @@ GLOBAL_STYLES = f"""
 }}
 
 QMainWindow, QWidget#RootWindow {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #050B14, stop:0.45 #07111F, stop:1 #050B14);
+    background: {COLORS["background"]};
 }}
 
-QDialog {{
-    background: #050B14;
-}}
-
-QDialog#NewSubjectDialog {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #050B14, stop:0.55 #07111F, stop:1 #050B14);
-}}
-
-QWidget#NewSubjectDialogContent {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #050B14, stop:0.55 #07111F, stop:1 #050B14);
+QDialog, QDialog#NewSubjectDialog, QWidget#NewSubjectDialogContent {{
+    background: {COLORS["background"]};
 }}
 
 QFrame#DialogActionBar {{
-    background: #060F1C;
+    background: {COLORS["surface"]};
     border-top: 1px solid {COLORS["border"]};
 }}
 
-QDialog QLabel {{
-    background: transparent;
-}}
-
-QWidget {{
-    background: transparent;
-}}
-
-QLabel {{
+QDialog QLabel, QWidget, QLabel {{
     background: transparent;
 }}
 
 QFrame#Sidebar {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #050B14, stop:1 #08111F);
+    background: {COLORS["sidebar"]};
     border-right: 1px solid {COLORS["border"]};
 }}
 
 QFrame#Topbar {{
-    background: #060F1C;
+    background: {COLORS["surface"]};
     border-bottom: 1px solid {COLORS["border"]};
 }}
 
 QFrame#Card, QFrame#StatCard, QFrame#SubjectCard, QFrame#ModuleCard,
 QFrame#StudyBlockRow, QFrame#Panel, QFrame#FeatureCard {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #101B2E, stop:1 #0B1626);
+    background: {COLORS["card"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 16px;
 }}
 
-QFrame#HeroCard {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #101B31, stop:0.55 #0C1829, stop:1 #0A1423);
+QFrame#FeatureCard, QFrame#HeroCard {{
+    background: {COLORS["card_alt"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 16px;
 }}
 
-QFrame#SubjectCard:hover, QFrame#ModuleCard:hover, QFrame#StudyBlockRow:hover {{
+QFrame#SubjectCard:hover, QFrame#ModuleCard:hover, QFrame#StudyBlockRow:hover,
+QFrame#FeatureCard:hover {{
     background: {COLORS["card_hover"]};
+    border-color: {COLORS["border_hover"]};
 }}
 
 QLabel#Title {{
@@ -282,7 +338,7 @@ QLabel#Weak {{
 }}
 
 QLabel#Link {{
-    color: #60A5FA;
+    color: {COLORS["accent_hover"]};
     font-weight: 600;
 }}
 
@@ -297,45 +353,45 @@ QPushButton {{
 
 QPushButton:hover {{
     background: {COLORS["card_hover"]};
-    border-color: {COLORS["blue"]};
+    border-color: {COLORS["border_hover"]};
 }}
 
 QPushButton:pressed {{
-    background: #081322;
-    border-color: {COLORS["purple_soft"]};
+    background: {COLORS["card_alt"]};
+    border-color: {COLORS["accent"]};
     padding-top: 11px;
     padding-bottom: 9px;
 }}
 
 QPushButton:disabled {{
-    background: #08111D;
-    border-color: #162235;
-    color: #536176;
+    background: #121613;
+    border-color: #222A25;
+    color: {COLORS["weak"]};
 }}
 
 QPushButton#PrimaryButton {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 {COLORS["blue"]}, stop:1 {COLORS["purple"]});
-    border-color: {COLORS["purple_soft"]};
-    color: white;
+    background: {COLORS["accent_dark"]};
+    border-color: {COLORS["accent"]};
+    color: {COLORS["text"]};
     font-weight: 700;
 }}
 
 QPushButton#PrimaryButton:hover {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #2563EB, stop:1 #6D28D9);
-    border-color: #A78BFA;
+    background: {COLORS["accent_active"]};
+    border-color: {COLORS["accent_hover"]};
+    color: #FFFFFF;
 }}
 
 QPushButton#PrimaryButton:pressed {{
-    background: #5B21B6;
-    border-color: #C4B5FD;
+    background: {COLORS["accent"]};
+    border-color: {COLORS["accent_hover"]};
+    color: #FFFFFF;
 }}
 
 QPushButton#PrimaryButton:disabled {{
-    background: #132033;
-    border-color: #1B2A42;
-    color: #65758B;
+    background: #182019;
+    border-color: {COLORS["border"]};
+    color: {COLORS["weak"]};
 }}
 
 QPushButton#GhostButton {{
@@ -344,18 +400,18 @@ QPushButton#GhostButton {{
 }}
 
 QPushButton#GhostButton:hover {{
-    background: #101B31;
-    border-color: {COLORS["blue"]};
+    background: {COLORS["card_hover"]};
+    border-color: {COLORS["border_hover"]};
 }}
 
 QPushButton#GhostButton:pressed {{
-    background: #0B1424;
-    border-color: {COLORS["purple_soft"]};
+    background: {COLORS["card_alt"]};
+    border-color: {COLORS["accent"]};
 }}
 
 QPushButton:checked {{
-    background: #182642;
-    border: 1px solid {COLORS["purple_soft"]};
+    background: {COLORS["accent_dark"]};
+    border: 1px solid {COLORS["accent"]};
     color: {COLORS["text"]};
 }}
 
@@ -370,12 +426,12 @@ QCheckBox::indicator {{
     height: 18px;
     border-radius: 5px;
     border: 1px solid {COLORS["border"]};
-    background: #0B1626;
+    background: {COLORS["card"]};
 }}
 
 QCheckBox::indicator:checked {{
-    background: {COLORS["purple"]};
-    border-color: {COLORS["purple_soft"]};
+    background: {COLORS["accent_dark"]};
+    border-color: {COLORS["accent"]};
 }}
 
 QPushButton#SidebarItem {{
@@ -389,9 +445,9 @@ QPushButton#SidebarItem {{
 }}
 
 QPushButton#SidebarItem[active="true"] {{
-    background: #101B31;
+    background: {COLORS["accent_dark"]};
     color: {COLORS["text"]};
-    border-left: 3px solid {COLORS["purple_soft"]};
+    border-left: 3px solid {COLORS["accent"]};
 }}
 
 QPushButton#SidebarItem:hover {{
@@ -405,8 +461,8 @@ QFrame#SidebarItemFrame {{
 }}
 
 QFrame#SidebarItemFrame[active="true"] {{
-    background: #101B31;
-    border-left: 3px solid {COLORS["purple_soft"]};
+    background: {COLORS["accent_dark"]};
+    border-left: 3px solid {COLORS["accent"]};
 }}
 
 QFrame#SidebarItemFrame:hover {{
@@ -414,7 +470,7 @@ QFrame#SidebarItemFrame:hover {{
 }}
 
 QToolButton#SidebarCollapseButton {{
-    background: rgba(11, 22, 38, 0.82);
+    background: {COLORS["card"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 10px;
     color: {COLORS["muted"]};
@@ -423,29 +479,38 @@ QToolButton#SidebarCollapseButton {{
 }}
 
 QToolButton#SidebarCollapseButton:hover {{
-    background: #101B31;
-    border-color: {COLORS["blue"]};
+    background: {COLORS["card_hover"]};
+    border-color: {COLORS["border_hover"]};
     color: {COLORS["text"]};
 }}
 
 QToolButton#SidebarCollapseButton:pressed {{
-    background: #0B1424;
-    border-color: {COLORS["purple_soft"]};
+    background: {COLORS["card_alt"]};
+    border-color: {COLORS["accent"]};
 }}
 
 QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox {{
-    background: #0B1626;
+    background: {COLORS["card"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 11px;
     padding: 10px 13px;
     color: {COLORS["text"]};
-    selection-background-color: {COLORS["blue"]};
+    selection-background-color: {COLORS["accent_active"]};
+}}
+
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus {{
+    border-color: {COLORS["accent"]};
+    background: {COLORS["card_alt"]};
 }}
 
 QFrame#SearchBox {{
-    background: #0B1626;
+    background: {COLORS["card"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 11px;
+}}
+
+QFrame#SearchBox:hover {{
+    border-color: {COLORS["border_hover"]};
 }}
 
 QLineEdit#SearchInput {{
@@ -459,43 +524,43 @@ QTextEdit, QPlainTextEdit {{
 }}
 
 QComboBox {{
-    background: #0B1626;
+    background: {COLORS["card"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 11px;
     padding: 10px 38px 10px 13px;
     color: {COLORS["text"]};
-    selection-background-color: {COLORS["purple"]};
+    selection-background-color: {COLORS["accent_active"]};
     min-height: 20px;
 }}
 
 QComboBox:hover {{
-    background: #0E1A2B;
-    border-color: {COLORS["blue"]};
+    background: {COLORS["card_hover"]};
+    border-color: {COLORS["border_hover"]};
 }}
 
 QComboBox:focus {{
-    border-color: {COLORS["purple_soft"]};
-    background: #0E1A2B;
+    border-color: {COLORS["accent"]};
+    background: {COLORS["card_alt"]};
 }}
 
 QComboBox:disabled {{
-    background: #08111D;
-    border-color: #162235;
-    color: #536176;
+    background: #121613;
+    border-color: #222A25;
+    color: {COLORS["weak"]};
 }}
 
 QComboBox::drop-down {{
     subcontrol-origin: padding;
     subcontrol-position: top right;
     width: 34px;
-    border-left: 1px solid #1B2A42;
+    border-left: 1px solid {COLORS["border"]};
     border-top-right-radius: 10px;
     border-bottom-right-radius: 10px;
-    background: #0E1A2B;
+    background: {COLORS["card_alt"]};
 }}
 
 QComboBox::drop-down:hover {{
-    background: #121F33;
+    background: {COLORS["card_hover"]};
 }}
 
 QComboBox::down-arrow {{
@@ -505,14 +570,14 @@ QComboBox::down-arrow {{
 }}
 
 QComboBox QAbstractItemView {{
-    background: #0B1626;
+    background: {COLORS["card"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 10px;
     color: {COLORS["text"]};
     padding: 0;
     margin: 0;
     outline: 0;
-    selection-background-color: #1D2F55;
+    selection-background-color: {COLORS["accent_dark"]};
     selection-color: {COLORS["text"]};
 }}
 
@@ -533,23 +598,23 @@ QComboBox QAbstractItemView::item {{
 }}
 
 QComboBox QAbstractItemView::item:hover {{
-    background: #12213A;
+    background: {COLORS["card_hover"]};
     color: {COLORS["text"]};
 }}
 
 QComboBox QAbstractItemView::item:selected {{
-    background: #243A68;
-    color: white;
+    background: {COLORS["accent_dark"]};
+    color: {COLORS["text"]};
 }}
 
 QSpinBox::up-button, QSpinBox::down-button {{
-    background: #0E1A2B;
-    border-left: 1px solid #1B2A42;
+    background: {COLORS["card_alt"]};
+    border-left: 1px solid {COLORS["border"]};
     width: 22px;
 }}
 
 QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
-    background: #121F33;
+    background: {COLORS["card_hover"]};
 }}
 
 QListWidget, QListView {{
@@ -564,29 +629,29 @@ QListWidget::item {{
 }}
 
 QListWidget::item:selected {{
-    background: rgba(59, 130, 246, 0.16);
+    background: rgba(111, 163, 107, 0.18);
     border-radius: 10px;
 }}
 
 QFrame#FileListItem {{
-    background: #0B1626;
+    background: {COLORS["card"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 12px;
 }}
 
 QFrame#FileListItem:hover {{
-    background: #101B31;
-    border-color: {COLORS["blue"]};
+    background: {COLORS["card_hover"]};
+    border-color: {COLORS["border_hover"]};
 }}
 
 QFrame#Toast {{
-    background: #0B1626;
+    background: {COLORS["card"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 12px;
 }}
 
 QFrame#StepCard {{
-    background: #0B1626;
+    background: {COLORS["card"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 14px;
 }}
@@ -606,8 +671,12 @@ QScrollBar::handle:vertical {{
     border-radius: 5px;
 }}
 
+QScrollBar::handle:vertical:hover {{
+    background: {COLORS["border_hover"]};
+}}
+
 QProgressBar {{
-    background: #162235;
+    background: {COLORS["card_alt"]};
     border: 0;
     border-radius: 4px;
     height: 8px;
@@ -615,8 +684,7 @@ QProgressBar {{
 }}
 
 QProgressBar::chunk {{
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 {COLORS["blue"]}, stop:1 {COLORS["purple_soft"]});
+    background: {COLORS["accent"]};
     border-radius: 5px;
 }}
 
@@ -635,6 +703,29 @@ QTabBar::tab {{
 
 QTabBar::tab:selected {{
     color: {COLORS["text"]};
-    border-bottom-color: {COLORS["blue"]};
+    border-bottom-color: {COLORS["accent"]};
+}}
+
+QTableWidget {{
+    background: {COLORS["card"]};
+    border: 1px solid {COLORS["border"]};
+    border-radius: 12px;
+    gridline-color: {COLORS["border"]};
+}}
+
+QHeaderView::section {{
+    background: {COLORS["card_alt"]};
+    border: 0;
+    border-bottom: 1px solid {COLORS["border"]};
+    color: {COLORS["muted"]};
+    padding: 8px;
+}}
+
+QToolTip {{
+    background: {COLORS["card_alt"]};
+    border: 1px solid {COLORS["border_hover"]};
+    color: {COLORS["text"]};
+    padding: 6px 8px;
+    border-radius: 6px;
 }}
 """

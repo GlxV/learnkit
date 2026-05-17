@@ -50,7 +50,7 @@ class StatCard(QFrame):
         self.setMaximumHeight(116)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         add_shadow(self, blur=22, y_offset=8, alpha=52)
-        selected_color = color or COLORS["blue"]
+        selected_color = color or COLORS["accent"]
         layout = QHBoxLayout(self)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(14)
@@ -58,8 +58,8 @@ class StatCard(QFrame):
         icon_shell = QFrame()
         icon_shell.setFixedSize(52, 52)
         icon_shell.setStyleSheet(
-            "background: rgba(124, 58, 237, 0.18); "
-            "border: 1px solid rgba(139, 92, 246, 0.28); "
+            f"background: {COLORS['accent_dark']}; "
+            f"border: 1px solid {COLORS['border_hover']}; "
             "border-radius: 26px;"
         )
         shell_layout = QHBoxLayout(icon_shell)
@@ -220,28 +220,26 @@ class FlashcardViewer(QFrame):
     def _apply_side_style(self) -> None:
         if self.showing_answer:
             self.setStyleSheet(
-                """
-                QFrame#Panel {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                        stop:0 #12251E, stop:1 #0B1B27);
-                    border: 1px solid #1F6B4D;
+                f"""
+                QFrame#Panel {{
+                    background: {COLORS['card_alt']};
+                    border: 1px solid {COLORS['accent']};
                     border-radius: 16px;
-                }
+                }}
                 """
             )
-            self.badge.setStyleSheet("color: #22C55E; font-weight: 800;")
+            self.badge.setStyleSheet(f"color: {COLORS['success']}; font-weight: 800;")
         else:
             self.setStyleSheet(
-                """
-                QFrame#Panel {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                        stop:0 #141A35, stop:1 #0B1626);
-                    border: 1px solid #3B2F75;
+                f"""
+                QFrame#Panel {{
+                    background: {COLORS['card']};
+                    border: 1px solid {COLORS['border_hover']};
                     border-radius: 16px;
-                }
+                }}
                 """
             )
-            self.badge.setStyleSheet("color: #8B5CF6; font-weight: 800;")
+            self.badge.setStyleSheet(f"color: {COLORS['accent_hover']}; font-weight: 800;")
 
 
 class QuestionViewer(QFrame):

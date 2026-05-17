@@ -31,7 +31,7 @@ class LogoMark(QWidget):
     def paintEvent(self, event) -> None:  # type: ignore[override]
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(QColor(COLORS["purple_soft"]), 7)
+        pen = QPen(QColor(COLORS["accent_hover"]), 7)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)
@@ -39,7 +39,7 @@ class LogoMark(QWidget):
         painter.drawLine(QPointF(23, 25), QPointF(37, 12))
         painter.drawLine(QPointF(23, 25), QPointF(39, 38))
 
-        soft_pen = QPen(QColor(COLORS["blue"]), 7)
+        soft_pen = QPen(QColor(COLORS["accent"]), 7)
         soft_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(soft_pen)
         painter.drawLine(QPointF(8, 36), QPointF(18, 36))

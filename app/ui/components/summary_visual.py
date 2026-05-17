@@ -134,13 +134,13 @@ class VisualSummaryWidget(QWidget):
         color = {
             "warning": COLORS["amber"],
             "example": COLORS["green"],
-            "quote": COLORS["purple_soft"],
-            "formula": COLORS["blue"],
-        }.get(variant, COLORS["blue"])
+            "quote": COLORS["accent_hover"],
+            "formula": COLORS["accent"],
+        }.get(variant, COLORS["accent"])
         panel = GlassPanel()
         panel.setStyleSheet(
             f"QFrame#Panel {{ border: 1px solid {color}; border-radius: 16px; "
-            f"background: rgba(11, 22, 38, 0.88); }}"
+            f"background: {COLORS['card_alt']}; }}"
         )
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 18, 22, 18)
@@ -189,7 +189,7 @@ class VisualSummaryWidget(QWidget):
         for item in section.get("items", []):
             tag = QLabel(str(item))
             tag.setStyleSheet(
-                f"background: rgba(124, 58, 237, 0.20); border: 1px solid {COLORS['border']}; "
+                f"background: {COLORS['accent_dark']}; border: 1px solid {COLORS['border']}; "
                 f"border-radius: 12px; padding: 7px 12px; color: {COLORS['text']};"
             )
             row.addWidget(tag)

@@ -20,7 +20,7 @@ class IconBadge(QFrame):
     def __init__(
         self,
         text: str,
-        color: str = COLORS["purple"],
+        color: str = COLORS["accent"],
         size: int = 46,
         radius: int = 14,
         font_size: int = 17,
@@ -87,7 +87,7 @@ class SoftIconBadge(QLabel):
     def __init__(
         self,
         text: str,
-        color: str = COLORS["purple_soft"],
+        color: str = COLORS["accent_hover"],
         size: int = 50,
         font_size: int = 18,
     ) -> None:
@@ -97,8 +97,8 @@ class SoftIconBadge(QLabel):
         self.setStyleSheet(
             f"""
             QLabel {{
-                background: rgba(124, 58, 237, 0.20);
-                border: 1px solid rgba(139, 92, 246, 0.28);
+                background: {COLORS["accent_dark"]};
+                border: 1px solid {COLORS["border_hover"]};
                 border-radius: {size // 2}px;
                 color: {color};
                 font-size: {font_size}px;

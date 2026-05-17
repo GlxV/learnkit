@@ -26,8 +26,8 @@ class FileListItem(QFrame):
         icon.setFixedSize(42, 42)
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon.setStyleSheet(
-            "background: rgba(59, 130, 246, 0.14);"
-            "border: 1px solid rgba(59, 130, 246, 0.30);"
+            f"background: {COLORS['accent_dark']};"
+            f"border: 1px solid {COLORS['border_hover']};"
             "border-radius: 12px;"
             "font-weight: 800;"
         )
@@ -95,7 +95,7 @@ class FileListItem(QFrame):
     def _status_color(self, status: str) -> str:
         return {
             "aguardando": COLORS["muted"],
-            "extraindo": COLORS["blue"],
+            "extraindo": COLORS["accent"],
             "extraido": COLORS["green"],
             "aviso": COLORS["amber"],
             "erro": COLORS["red"],
