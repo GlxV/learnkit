@@ -14,6 +14,14 @@ from app.application.dto.study_package import (
     StudyPackageDTO,
     StudyPackageImportDTO,
 )
+from app.application.dto.visual_summary import (
+    SUPPORTED_VISUAL_BLOCK_TYPES,
+    dump_visual_summary,
+    normalize_visual_block,
+    normalize_visual_summary,
+    parse_visual_summary,
+    visual_summary_slides,
+)
 
 __all__ = [
     "FlashcardQueueItemDTO",
@@ -28,4 +36,10 @@ __all__ = [
     "ReviewDashboardSummaryDTO",
     "StudyPackageDTO",
     "StudyPackageImportDTO",
+    "SUPPORTED_VISUAL_BLOCK_TYPES",
+    "dump_visual_summary",
+    "normalize_visual_block",
+    "normalize_visual_summary",
+    "parse_visual_summary",
+    "visual_summary_slides",
 ]

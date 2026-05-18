@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QDialog,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QMessageBox,
@@ -125,6 +126,25 @@ class SummaryDialog(QDialog):
         self.subject, self.module, self.block = context.subject, context.module, context.block
         self.setWindowTitle(f"Resumo - {self.block.title}")
         self.resize(980, 720)
+        self.setObjectName("SummaryDialog")
+        self.setStyleSheet(
+            f"""
+            QDialog#SummaryDialog {{
+                background: {COLORS['background']};
+            }}
+            QStackedWidget {{
+                background: {COLORS['background']};
+                border: 0;
+            }}
+            QTextBrowser#SummaryTextViewer {{
+                background: {COLORS['card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 14px;
+                padding: 16px;
+                color: {COLORS['text']};
+            }}
+            """
+        )
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 22, 22, 22)
         layout.setSpacing(14)
@@ -157,6 +177,8 @@ class SummaryDialog(QDialog):
 
         self.stack = QStackedWidget()
         self.text_viewer = QTextBrowser()
+        self.text_viewer.setObjectName("SummaryTextViewer")
+        self.text_viewer.setFrameShape(QFrame.Shape.NoFrame)
         self.text_viewer.setOpenExternalLinks(False)
         markdown = self.block.summary.content if self.block.summary else ""
         self.text_viewer.setMarkdown(markdown or "Este bloco ainda não possui resumo importado.")

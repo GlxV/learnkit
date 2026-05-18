@@ -71,6 +71,11 @@ Regras obrigatorias:
 - O gabarito deve ser somente A, B, C ou D.
 - Crie um resumo texto objetivo, com visao geral e topicos principais.
 - Em summary_visual, gere um objeto JSON estruturado compativel com o LearnKit.
+- Para IAs fortes, use blocos variados no summary_visual: hero, section, cards, callout, table,
+  comparison, steps, timeline, tags, formula, definition, example, mistakes, flow e chart.
+- Charts devem ser apenas dados declarativos em JSON. Nunca envie codigo Python, HTML ou JS.
+- Para items, use campos semanticos quando fizer sentido: term/definition, mistake/correction,
+  step/title/text, name/formula, label/text. O LearnKit renderiza esses formatos diretamente.
 - Se nao conseguir gerar resumo visual, use um objeto vazio em summary_visual.
 
 Formato JSON esperado:
@@ -93,6 +98,52 @@ Formato JSON esperado:
         "items": [
           {{"title": "...", "text": "..."}}
         ]
+      }},
+      {{
+        "type": "callout",
+        "variant": "tip",
+        "title": "Atalho mental",
+        "text": "..."
+      }},
+      {{
+        "type": "table",
+        "title": "Comparacao rapida",
+        "headers": ["Conceito", "Quando usar"],
+        "rows": [["...", "..."]]
+      }},
+      {{
+        "type": "steps",
+        "title": "Sequencia essencial",
+        "items": [
+          {{"step": 1, "title": "Primeiro passo", "text": "Explique o que acontece."}}
+        ]
+      }},
+      {{
+        "type": "mistakes",
+        "title": "Erros comuns",
+        "items": [
+          {{"mistake": "Erro provavel.", "correction": "Como corrigir."}}
+        ]
+      }},
+      {{
+        "type": "flow",
+        "title": "Fluxo do processo",
+        "nodes": [
+          {{"id": "a", "label": "Inicio"}},
+          {{"id": "b", "label": "Resultado"}}
+        ],
+        "edges": [
+          {{"from": "a", "to": "b"}}
+        ]
+      }},
+      {{
+        "type": "chart",
+        "chart_type": "bar",
+        "title": "Peso dos conceitos",
+        "labels": ["Conceito A", "Conceito B"],
+        "values": [80, 60],
+        "unit": "relevancia",
+        "description": "Grafico didatico para revisao."
       }}
     ]
   }},
@@ -147,6 +198,11 @@ Regras obrigatorias:
 - O gabarito deve ser somente A, B, C ou D.
 - Crie um resumo texto objetivo, com visao geral e topicos principais.
 - Em # RESUMO_VISUAL, gere JSON estruturado compativel com o LearnKit.
+- Para IAs fortes, use blocos variados: hero, section, cards, callout, table, comparison, steps,
+  timeline, tags, formula, definition, example, mistakes, flow e chart.
+- Charts devem ser apenas dados declarativos em JSON. Nunca envie codigo Python, HTML ou JS.
+- Para items, prefira campos semanticos: term/definition, mistake/correction, step/title/text,
+  name/formula, label/text. Nao use "Item" quando houver conteudo especifico.
 - Nao coloque Markdown, comentarios ou cercas ``` dentro de # RESUMO_VISUAL.
 - Se nao conseguir gerar resumo visual, deixe # RESUMO_VISUAL vazio e preserve as outras secoes.
 
@@ -186,6 +242,39 @@ Formato exato esperado:
       "variant": "warning",
       "title": "Atencao",
       "text": "..."
+    }},
+    {{
+      "type": "definition",
+      "title": "Conceito-chave",
+      "term": "Termo",
+      "definition": "Definicao direta."
+    }},
+    {{
+      "type": "mistakes",
+      "title": "Erros comuns",
+      "items": [
+        {{"mistake": "Erro provavel.", "correction": "Como corrigir."}}
+      ]
+    }},
+    {{
+      "type": "flow",
+      "title": "Fluxo",
+      "nodes": [
+        {{"id": "a", "label": "Inicio"}},
+        {{"id": "b", "label": "Fim"}}
+      ],
+      "edges": [
+        {{"from": "a", "to": "b"}}
+      ]
+    }},
+    {{
+      "type": "chart",
+      "chart_type": "horizontal_bar",
+      "title": "Comparacao didatica",
+      "labels": ["A", "B", "C"],
+      "values": [90, 70, 50],
+      "unit": "pontuacao",
+      "description": "Use somente dados declarativos."
     }}
   ]
 }}

@@ -1,0 +1,143 @@
+{
+  "schema_version": "learnkit.study_package.v1",
+  "summary_text": "Resumo de exemplo para validar todos os blocos visuais.",
+  "summary_visual": {
+    "title": "Estruturas de Dados",
+    "subtitle": "Pacote visual completo para QA local",
+    "sections": [
+      {
+        "type": "hero",
+        "title": "Como escolher uma estrutura",
+        "text": "Compare acesso, insercao, remocao e ordem de processamento."
+      },
+      {
+        "type": "section",
+        "title": "Ideia geral",
+        "text": "Estruturas de dados organizam informacoes para reduzir custo e tornar operacoes previsiveis."
+      },
+      {
+        "type": "cards",
+        "title": "Resumo rapido",
+        "items": [
+          {"title": "Array", "text": "Acesso direto por indice."},
+          {"title": "Lista ligada", "text": "Nos conectados por referencias."}
+        ]
+      },
+      {
+        "type": "callout",
+        "variant": "tip",
+        "title": "Atalho mental",
+        "text": "Fila lembra atendimento; pilha lembra pratos empilhados."
+      },
+      {
+        "type": "table",
+        "title": "Custos didaticos",
+        "headers": ["Estrutura", "Acesso", "Insercao"],
+        "rows": [
+          ["Array", "Rapido", "Pode exigir deslocamento"],
+          ["Lista ligada", "Sequencial"]
+        ]
+      },
+      {
+        "type": "comparison",
+        "title": "Fila vs Pilha",
+        "left": {
+          "title": "Fila",
+          "items": ["FIFO", "Remove pelo inicio"]
+        },
+        "right": {
+          "title": "Pilha",
+          "items": ["LIFO", "Remove pelo topo"]
+        }
+      },
+      {
+        "type": "steps",
+        "title": "Insercao em arvore binaria",
+        "items": [
+          {"step": 1, "title": "Inserir 15", "text": "O valor 15 entra primeiro e vira raiz."},
+          {"step": 2, "title": "Inserir 10", "text": "Como 10 e menor que 15, vai para a esquerda."}
+        ]
+      },
+      {
+        "type": "timeline",
+        "title": "Busca em lista ligada",
+        "items": [
+          {"label": "Inicio", "text": "Comece pela cabeca."},
+          {"label": "Percorrer", "text": "Siga o ponteiro proximo."}
+        ]
+      },
+      {
+        "type": "tags",
+        "title": "Palavras-chave",
+        "items": ["FIFO", "LIFO", "Indice", "Ponteiro"]
+      },
+      {
+        "type": "formula",
+        "title": "Regras centrais",
+        "items": [
+          {"name": "Fila", "formula": "FIFO = First In, First Out"},
+          {"name": "Pilha", "formula": "LIFO = Last In, First Out"}
+        ]
+      },
+      {
+        "type": "definition",
+        "title": "Conceito",
+        "term": "Estrutura de Dados",
+        "definition": "Maneira especifica de organizar, gerenciar e armazenar dados."
+      },
+      {
+        "type": "example",
+        "title": "Exemplos praticos",
+        "items": [
+          {"title": "Array", "text": "Lista de convidados com acesso direto ao convidado numero 5."}
+        ]
+      },
+      {
+        "type": "mistakes",
+        "title": "Erros comuns",
+        "items": [
+          {
+            "mistake": "Confundir fila com pilha.",
+            "correction": "Fila remove pelo inicio e segue FIFO; pilha remove pelo topo e segue LIFO."
+          }
+        ]
+      },
+      {
+        "type": "flow",
+        "title": "Fluxo de uma lista ligada simples",
+        "nodes": [
+          {"id": "head", "label": "Cabeca"},
+          {"id": "node1", "label": "No: dado + proximo"},
+          {"id": "node2", "label": "No: dado + proximo"},
+          {"id": "null", "label": "None / Nulo"}
+        ],
+        "edges": [
+          {"from": "head", "to": "node1"},
+          {"from": "node1", "to": "node2"},
+          {"from": "node2", "to": "null"}
+        ]
+      },
+      {
+        "type": "chart",
+        "chart_type": "bar",
+        "title": "Comparacao didatica",
+        "labels": ["Array", "Lista ligada", "Pilha", "Fila"],
+        "values": [90, 70, 55, 60],
+        "unit": "pontuacao",
+        "description": "Comparacao visual para revisao."
+      }
+    ]
+  },
+  "flashcards": [
+    {"front": "O que significa FIFO?", "back": "First In, First Out."}
+  ],
+  "questions": [
+    {
+      "statement": "Qual estrutura segue LIFO?",
+      "alternatives": {"A": "Fila", "B": "Pilha", "C": "Array", "D": "Tabela"},
+      "correct_answer": "B",
+      "explanation": "Pilha remove primeiro o ultimo item inserido."
+    }
+  ],
+  "parser_warnings": []
+}

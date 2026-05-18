@@ -158,7 +158,6 @@ class QuestionsPage(QWidget):
                 )
             )
             return
-        self.question_queue = self._fresh_question_queue()
         if self.current_index >= len(self.question_queue):
             self.current_index = max(0, len(self.question_queue) - 1)
         if not self.question_queue:
@@ -195,6 +194,7 @@ class QuestionsPage(QWidget):
         attempts = progress.question_attempts.get(question.id, [])
         display_answer = self.selected_answer or str(latest_answer.get("selected_answer", "") or "")
         show_result = self.answered or bool(latest_answer)
+        state = self._display_state(queue_item, latest_answer)
         qcard = panel()
         qlayout = QVBoxLayout(qcard)
         qlayout.setContentsMargins(24, 22, 24, 22)
@@ -203,7 +203,7 @@ class QuestionsPage(QWidget):
             "unanswered": "não respondida",
             "wrong": "errada",
             "correct": "correta",
-        }.get(str(queue_item["state"]), "pergunta")
+        }.get(state, "pergunta")
         qlayout.addWidget(label(f"Questão {self.current_index + 1} de {len(self.question_queue)} • {state_label}", "Weak"))
         statement = label(question.statement, "HeroTitle")
         qlayout.addWidget(statement)
@@ -304,20 +304,12 @@ class QuestionsPage(QWidget):
             correct=question.correct_answer,
             is_correct=is_correct,
         )
-        updated_queue = self._fresh_question_queue()
-        next_index = next(
-            (index for index, item in enumerate(updated_queue) if item["question_id"] == question.id),
-            None,
+        self._sync_queue_after_answer(
+            question.id,
+            self.selected_answer,
+            question.correct_answer,
+            is_correct,
         )
-        if next_index is None:
-            self.question_queue = updated_queue
-            self.current_index = min(self.current_index, max(0, len(updated_queue) - 1))
-            self.selected_answer = None
-            self.answered = False
-        else:
-            self.question_queue = updated_queue
-            self.current_index = next_index
-            self.answered = True
         self._render_session()
 
     def _paint_answers(self, question: Question, selected_answer: str | None = None) -> None:
@@ -363,6 +355,43 @@ class QuestionsPage(QWidget):
             self.current_block.id,
             self._selected_filter_mode(),
         ).queue
+
+    def _display_state(self, queue_item: dict[str, object], latest_answer: dict[str, object]) -> str:
+        if latest_answer:
+            return "correct" if latest_answer.get("is_correct") else "wrong"
+        return str(queue_item.get("state", "unanswered"))
+
+    def _sync_queue_after_answer(
+        self,
+        question_id: str,
+        selected_answer: str,
+        correct_answer: str,
+        is_correct: bool,
+    ) -> None:
+        if self._selected_filter_mode() == "all":
+            for item in self.question_queue:
+                if item.get("question_id") == question_id:
+                    item["state"] = "correct" if is_correct else "wrong"
+                    item["selected_answer"] = selected_answer
+                    item["correct_answer"] = correct_answer
+                    item["attempts"] = int(item.get("attempts", 0) or 0) + 1
+                    break
+            self.answered = True
+            return
+
+        updated_queue = self._fresh_question_queue()
+        next_index = next(
+            (index for index, item in enumerate(updated_queue) if item["question_id"] == question_id),
+            None,
+        )
+        self.question_queue = updated_queue
+        if next_index is None:
+            self.current_index = min(self.current_index, max(0, len(updated_queue) - 1))
+            self.selected_answer = None
+            self.answered = False
+        else:
+            self.current_index = next_index
+            self.answered = True
 
     def _selected_filter_mode(self) -> str:
         return str(self.filter_combo.currentData() or "all") if hasattr(self, "filter_combo") else "all"

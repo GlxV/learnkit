@@ -27,6 +27,12 @@ def test_build_prompt_includes_structure_options_and_extracted_content() -> None
     assert '"summary_visual"' in prompt
     assert '"flashcards"' in prompt
     assert '"questions"' in prompt
+    assert '"type": "chart"' in prompt
+    assert '"type": "mistakes"' in prompt
+    assert '"type": "flow"' in prompt
+    assert '"step": 1' in prompt
+    assert "hero, section, cards, callout, table" in prompt
+    assert "Nunca envie codigo Python, HTML ou JS" in prompt
     assert "5 flashcards" in prompt
     assert "3 perguntas" in prompt
     assert "intermediario" in prompt
@@ -48,3 +54,5 @@ def test_build_prompt_keeps_markdown_legacy_format_when_requested() -> None:
     assert "# RESUMO_VISUAL" in prompt
     assert "# FLASHCARDS" in prompt
     assert "# PERGUNTAS" in prompt
+    assert '"chart_type": "horizontal_bar"' in prompt
+    assert '"mistake": "Erro provavel."' in prompt

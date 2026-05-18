@@ -8,6 +8,7 @@ venv/
 *.egg-info/
 data/*
 !data/.gitkeep
+backups/
 app/logs/*.log
 exports/
 build/

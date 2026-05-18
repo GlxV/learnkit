@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QToolButton, QVBoxLayout, QWidget
 
+from app.version import __version__
 from app.ui.components.icons import LineIcon, LogoMark
 from app.ui.feedback import future_action, log_action
 from app.ui.navigation import NAV_ITEMS, NavItem, visible_nav_items
@@ -132,7 +133,7 @@ class Sidebar(QFrame):
         self.community = CollapsibleCommunity()
         layout.addWidget(self.community)
         layout.addSpacing(10)
-        self.footer = QLabel("Feito com código aberto\nv0.1.0")
+        self.footer = QLabel(f"Feito com código aberto\nv{__version__}")
         self.footer.setObjectName("Weak")
         self.footer.setWordWrap(True)
         self.footer.setStyleSheet(f"color: {COLORS['weak']}; font-size: 12px;")

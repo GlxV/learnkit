@@ -92,3 +92,90 @@ def test_subject_catalog_use_case_updates_subject_metadata(tmp_path) -> None:
     assert updated.description == "Descricao nova"
     assert updated.color == "#EC4899"
     assert updated.icon == "chart"
+
+
+def test_visual_summary_widget_renders_rich_blocks_offscreen() -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from PySide6.QtWidgets import QApplication, QScrollArea
+
+    from app.ui.components.summary_visual import PresentationDialog, VisualSummaryWidget
+    from app.ui.theme import apply_app_theme
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_app_theme(app)
+    raw = """
+    {
+      "title": "Estruturas de Dados",
+      "subtitle": "Revisao visual",
+      "sections": [
+        {"type": "hero", "title": "Ideia central", "text": "Organizar acesso e custo."},
+        {"type": "cards", "items": [{"title": "Array", "text": "Indice direto."}]},
+        {"type": "callout", "variant": "warning", "title": "Pegadinha", "text": "Custo muda."},
+        {"type": "table", "headers": ["Tipo", "Uso"], "rows": [["Pilha", "LIFO"]]},
+        {"type": "chart", "chart_type": "bar", "labels": ["Array"], "values": [90]}
+      ]
+    }
+    """
+
+    widget = VisualSummaryWidget(raw)
+    dialog = PresentationDialog("Estruturas de Dados", raw)
+
+    assert widget.findChildren(QScrollArea)
+    assert dialog.counter.text() == "1 / 5"
+
+
+def test_visual_summary_widget_renders_non_standard_item_fields() -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from PySide6.QtWidgets import QApplication, QLabel
+
+    from app.ui.components.summary_visual import VisualSummaryWidget
+    from app.ui.theme import apply_app_theme
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_app_theme(app)
+    raw = """
+    {
+      "title": "Estruturas",
+      "sections": [
+        {
+          "type": "mistakes",
+          "title": "Erros comuns",
+          "items": [
+            {
+              "mistake": "Confundir fila com pilha.",
+              "correction": "Fila segue FIFO; pilha segue LIFO."
+            }
+          ]
+        },
+        {
+          "type": "steps",
+          "title": "Insercao",
+          "items": [
+            {"step": 1, "title": "Inserir 15", "text": "O valor vira raiz."}
+          ]
+        },
+        {
+          "type": "flow",
+          "title": "Fluxo",
+          "nodes": [
+            {"id": "head", "label": "Cabeca"},
+            {"id": "node1", "label": "No: dado + proximo"}
+          ],
+          "edges": [{"from": "head", "to": "node1"}]
+        }
+      ]
+    }
+    """
+
+    widget = VisualSummaryWidget(raw)
+    texts = [child.text() for child in widget.findChildren(QLabel)]
+
+    assert "Confundir fila com pilha." in texts
+    assert "Fila segue FIFO; pilha segue LIFO." in texts
+    assert "Inserir 15" in texts
+    assert "O valor vira raiz." in texts
+    assert "Cabeca" in texts
+    assert "No: dado + proximo" in texts
+    assert "Item" not in texts

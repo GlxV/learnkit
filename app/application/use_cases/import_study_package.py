@@ -4,6 +4,7 @@ from app.application.dto.study_package import (
     ImportStudyPackageResultDTO,
     StudyPackageImportDTO,
 )
+from app.application.dto.visual_summary import dump_visual_summary
 from app.core.models.ai_response import AIResponse
 from app.core.models.flashcard import Flashcard
 from app.core.models.question import Question
@@ -103,7 +104,7 @@ class ImportStudyPackageUseCase:
             parser_warnings=list(package.parser_warnings),
         )
         block.summary = Summary(package.summary_text) if package.summary_text.strip() else None
-        block.summary_visual = package.summary_visual
+        block.summary_visual = dump_visual_summary(package.summary_visual)
         block.preferred_summary_mode = "visual" if package.summary_visual.strip() else "text"
         block.flashcards = [
             Flashcard(question=item.front, answer=item.back, source=item.source)

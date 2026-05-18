@@ -128,6 +128,45 @@ def test_parse_ai_response_use_case_accepts_versioned_json_package() -> None:
     assert dto.questions[0].alternatives["D"] == "Quatro"
 
 
+def test_parse_ai_response_use_case_normalizes_rich_visual_items() -> None:
+    dto = ParseAIResponseUseCase().execute(
+        """
+        {
+          "schema_version": "learnkit.study_package.v1",
+          "summary_text": "Resumo JSON",
+          "summary_visual": {
+            "title": "Visual",
+            "sections": [
+              {
+                "type": "mistakes",
+                "items": [
+                  {
+                    "mistake": "Confundir fila com pilha.",
+                    "correction": "Fila segue FIFO; pilha segue LIFO."
+                  }
+                ]
+              },
+              {
+                "type": "flow",
+                "nodes": [
+                  {"id": "head", "label": "Cabeca"},
+                  {"id": "node1", "label": "No"}
+                ],
+                "edges": [{"from": "head", "to": "node1"}]
+              }
+            ]
+          },
+          "flashcards": [],
+          "questions": []
+        }
+        """
+    )
+
+    assert '"title": "Confundir fila com pilha."' in dto.summary_visual
+    assert '"text": "Fila segue FIFO; pilha segue LIFO."' in dto.summary_visual
+    assert '"items": [\n        "Cabeca",\n        "No"\n      ]' in dto.summary_visual
+
+
 def test_parse_ai_response_use_case_accepts_fenced_json_package() -> None:
     dto = ParseAIResponseUseCase().execute(
         """```json

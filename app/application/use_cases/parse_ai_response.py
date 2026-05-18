@@ -7,6 +7,7 @@ from app.application.dto.study_package import (
     QuestionDTO,
     StudyPackageDTO,
 )
+from app.application.dto.visual_summary import dump_visual_summary
 from app.core.importer.ai_response_parser import AIResponseParser
 
 
@@ -21,7 +22,7 @@ class ParseAIResponseUseCase:
         parsed = self.parser.parse(raw_text)
         return StudyPackageDTO(
             summary_text=parsed.summary.content,
-            summary_visual=parsed.summary_visual,
+            summary_visual=dump_visual_summary(parsed.summary_visual),
             flashcards=[
                 FlashcardDTO(front=card.question, back=card.answer, source=card.source)
                 for card in parsed.flashcards
@@ -75,12 +76,10 @@ class ParseAIResponseUseCase:
             if isinstance(item, dict)
         ]
         summary_visual = data.get("summary_visual", "")
-        if isinstance(summary_visual, dict):
-            summary_visual = json.dumps(summary_visual, ensure_ascii=False, indent=2)
         return StudyPackageDTO(
             schema_version=schema_version,
             summary_text=str(data.get("summary_text", "")),
-            summary_visual=str(summary_visual or ""),
+            summary_visual=dump_visual_summary(summary_visual),
             flashcards=flashcards,
             questions=questions,
             parser_warnings=[
