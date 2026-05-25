@@ -217,6 +217,40 @@ def test_import_study_package_use_case_create_persists_materials_and_progress(tm
     assert progress.questions_total == 1
 
 
+def test_import_create_automatically_schedules_reviews_only_when_enabled(tmp_path: Path) -> None:
+    storage = SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False)
+    enabled = ImportStudyPackageUseCase(
+        storage,
+        settings_provider=lambda: {"review_cycle_enabled": True},
+    )
+
+    result = enabled.execute(
+        StudyPackageImportDTO(
+            extraction=_extraction(text="texto inicial"),
+            generated_prompt="prompt gerado",
+            raw_ai_response=_raw_response("Resumo inicial"),
+            package=_package(_raw_response("Resumo inicial")),
+            destination=ImportDestinationDTO("Matematica", "Funcoes", "Funcao linear"),
+            mode="create",
+        )
+    )
+
+    assert len(storage.list_review_schedules(result.block.id)) == 4
+
+    disabled_result = ImportStudyPackageUseCase(storage).execute(
+        StudyPackageImportDTO(
+            extraction=_extraction(text="outro texto"),
+            generated_prompt="prompt gerado",
+            raw_ai_response=_raw_response("Outro resumo"),
+            package=_package(_raw_response("Outro resumo")),
+            destination=ImportDestinationDTO("Matematica", "Funcoes", "Funcao quadratica"),
+            mode="create",
+        )
+    )
+
+    assert storage.list_review_schedules(disabled_result.block.id) == []
+
+
 def test_import_study_package_use_case_update_replaces_materials_and_prunes_progress(tmp_path: Path) -> None:
     storage = SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False)
     use_case = ImportStudyPackageUseCase(storage)
@@ -239,6 +273,9 @@ def test_import_study_package_use_case_update_replaces_materials_and_prunes_prog
     progress_service = ProgressService(storage)
     progress_service.record_flashcard(created.block.id, old_card_id, "easy")
     progress_service.record_question(created.block.id, old_question_id, "A", "A")
+    from app.application.use_cases.manage_review_cycle import ManageReviewCycleUseCase
+
+    ManageReviewCycleUseCase(storage).activate_cycle(created.block.id)
 
     updated = use_case.execute(
         StudyPackageImportDTO(
@@ -263,6 +300,7 @@ def test_import_study_package_use_case_update_replaces_materials_and_prunes_prog
     assert old_question_id not in progress.answered_questions
     assert progress.flashcards_reviewed == 0
     assert progress.questions_answered == 0
+    assert len(storage.list_review_schedules(created.block.id)) == 4
 
 
 def test_search_query_service_finds_nested_content(tmp_path: Path) -> None:

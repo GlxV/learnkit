@@ -70,3 +70,19 @@ def test_study_session_query_service_returns_question_session_with_filter(tmp_pa
     assert len(session.queue) == 1
     assert session.queue[0]["question_id"] == block.questions[0].id
     assert session.queue[0]["state"] == "wrong"
+
+
+def test_record_access_starts_cycle_for_existing_block_only_when_automatic_enabled(
+    tmp_path: Path,
+) -> None:
+    storage, block = _create_study_block(tmp_path)
+
+    StudySessionQueryService(storage).record_access(block.id)
+    assert storage.list_review_schedules(block.id) == []
+
+    StudySessionQueryService(
+        storage,
+        settings_provider=lambda: {"review_cycle_enabled": True},
+    ).record_access(block.id)
+
+    assert len(storage.list_review_schedules(block.id)) == 4

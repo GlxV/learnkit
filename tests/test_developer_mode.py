@@ -25,6 +25,7 @@ def test_sidebar_hides_database_by_default_and_can_toggle() -> None:
         "home",
         "subjects",
         "studies",
+        "reviews",
         "flashcards",
         "questions",
         "progress",

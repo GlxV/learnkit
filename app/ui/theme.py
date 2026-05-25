@@ -265,6 +265,30 @@ QDialog, QDialog#NewSubjectDialog, QWidget#NewSubjectDialogContent {{
     background: {COLORS["background"]};
 }}
 
+QDialog#ReviewSessionDialog,
+QWidget#ReviewSessionViewport,
+QWidget#ReviewSessionContent,
+QWidget#ReviewSessionFooter {{
+    background: {COLORS["background"]};
+}}
+
+QScrollArea#ReviewSessionScroll {{
+    border: 0;
+    background: {COLORS["background"]};
+}}
+
+QDialog#CombinedReviewSessionDialog,
+QWidget#CombinedReviewSessionViewport,
+QWidget#CombinedReviewSessionContent,
+QWidget#CombinedReviewSessionFooter {{
+    background: {COLORS["background"]};
+}}
+
+QScrollArea#CombinedReviewSessionScroll {{
+    border: 0;
+    background: {COLORS["background"]};
+}}
+
 QFrame#DialogActionBar {{
     background: {COLORS["surface"]};
     border-top: 1px solid {COLORS["border"]};
@@ -301,6 +325,43 @@ QFrame#SubjectCard:hover, QFrame#ModuleCard:hover, QFrame#StudyBlockRow:hover,
 QFrame#FeatureCard:hover {{
     background: {COLORS["card_hover"]};
     border-color: {COLORS["border_hover"]};
+}}
+
+QFrame#SelectedStudyBlockRow {{
+    background: {COLORS["accent_dark"]};
+    border: 1px solid {COLORS["accent"]};
+    border-radius: 16px;
+}}
+
+QFrame#CombinedSelectionBar {{
+    background: {COLORS["card_alt"]};
+    border: 1px solid {COLORS["border_hover"]};
+    border-radius: 16px;
+}}
+
+QPushButton#SelectionChip {{
+    background: transparent;
+    border-color: {COLORS["border_hover"]};
+    color: {COLORS["muted"]};
+    padding: 7px 11px;
+    min-height: 16px;
+}}
+
+QPushButton#SelectionChip:checked {{
+    background: {COLORS["accent_dark"]};
+    border-color: {COLORS["accent"]};
+    color: {COLORS["text"]};
+    font-weight: 700;
+}}
+
+QLabel#ReviewOriginTag {{
+    background: {COLORS["accent_dark"]};
+    border: 1px solid {COLORS["border_hover"]};
+    border-radius: 8px;
+    padding: 5px 9px;
+    color: {COLORS["accent_hover"]};
+    font-size: 12px;
+    font-weight: 700;
 }}
 
 QLabel#Title {{

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -17,7 +19,9 @@ from app.application.dto.progress import (
     ReviewDashboardDTO,
     ReviewDashboardSummaryDTO,
 )
+from app.application.dto.review_cycle import ReviewQueueDTO
 from app.application.query_services.dashboard_query_service import DashboardQueryService
+from app.application.query_services.review_cycle_query_service import ReviewCycleQueryService
 from app.application.query_services.ui_data_provider import UIBlock, UIDataProvider, UIModule, UISubject
 from app.ui.components.cards import EmptyState, ProgressLine, StatCard, label
 from app.ui.components.open_source_panel import OpenSourcePanel
@@ -35,6 +39,7 @@ class HomePage(QWidget):
         super().__init__()
         self.provider = provider
         self.dashboard_query_service = DashboardQueryService(provider.storage)
+        self.review_cycle_query_service = ReviewCycleQueryService(provider.storage)
         self.subject_filter = ALL_SUBJECTS
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -49,6 +54,9 @@ class HomePage(QWidget):
         modules = [module for subject in subjects for module in subject.modules]
         dashboard = self.dashboard_query_service.review_dashboard_dto(
             None if self.subject_filter == ALL_SUBJECTS else self.subject_filter
+        )
+        scheduled_reviews = self.review_cycle_query_service.queue(
+            subject_name=None if self.subject_filter == ALL_SUBJECTS else self.subject_filter
         )
 
         title_box = QVBoxLayout()
@@ -90,6 +98,7 @@ class HomePage(QWidget):
         lower.addWidget(self._priority_blocks_panel(dashboard.blocks, blocks), 0, 2)
         main_col.addLayout(lower)
 
+        side_col.addWidget(self._scheduled_reviews_panel(scheduled_reviews))
         side_col.addWidget(self._review_now_panel(dashboard.summary))
         side_col.addWidget(self._activity_panel(dashboard.activity))
         side_col.addWidget(OpenSourcePanel())
@@ -357,6 +366,33 @@ class HomePage(QWidget):
             layout.addLayout(row)
         return card
 
+    def _scheduled_reviews_panel(self, queue: ReviewQueueDTO) -> QWidget:
+        card = panel()
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(12)
+        layout.addWidget(label("Revisões de Hoje", "SectionTitle"))
+        row = QHBoxLayout()
+        pending = label(str(queue.today_count), "HeroTitle")
+        pending.setStyleSheet(f"color: {COLORS['accent_hover']}; font-size: 27px; font-weight: 800;")
+        row.addWidget(pending)
+        row.addWidget(label("pendentes para hoje", "Muted"), 1)
+        layout.addLayout(row)
+        overdue = label(f"{queue.overdue_count} atrasadas", "Muted")
+        overdue.setStyleSheet(f"color: {COLORS['red']}; font-weight: 700;")
+        layout.addWidget(overdue)
+        if queue.next_scheduled_at:
+            layout.addWidget(
+                label(f"Próxima revisão: {self._review_time(queue.next_scheduled_at)}", "Weak")
+            )
+        else:
+            layout.addWidget(label("Nenhuma revisão de bloco agendada.", "Weak"))
+        open_queue = QPushButton("Abrir fila de revisões")
+        open_queue.setObjectName("PrimaryButton")
+        open_queue.clicked.connect(lambda: self._navigate("reviews"))
+        layout.addWidget(open_queue)
+        return card
+
     def _activity_panel(self, activity: list[ReviewActivityDTO]) -> QWidget:
         card = panel()
         layout = QVBoxLayout(card)
@@ -436,6 +472,12 @@ class HomePage(QWidget):
     def _date(self, value: object) -> str:
         text = str(value or "")
         return text.split("T", 1)[0] if text else "sem data"
+
+    def _review_time(self, value: str) -> str:
+        try:
+            return datetime.fromisoformat(value).astimezone().strftime("%d/%m às %H:%M")
+        except ValueError:
+            return value
 
     def _open_subject(self, subject_name: str) -> None:
         window = self.window()

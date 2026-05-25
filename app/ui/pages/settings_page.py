@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from datetime import datetime
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -161,6 +162,26 @@ class SettingsPage(QWidget):
         study_form.addRow("Ordem das questões", self.question_order)
         study_form.addRow("Mostrar explicações primeiro", self.show_explanations)
         study_form.addRow("Confirmar saída de simulado", self.confirm_exit)
+        study_form.addRow(label("Ciclo de Revisão", "SectionTitle"))
+        self.review_cycle_enabled = QCheckBox()
+        self.review_step_1h_enabled = QCheckBox()
+        self.review_step_24h_enabled = QCheckBox()
+        self.review_step_7d_enabled = QCheckBox()
+        self.review_step_30d_enabled = QCheckBox()
+        self.preferred_review_time = QLineEdit()
+        self.preferred_review_time.setPlaceholderText("HH:mm (opcional)")
+        study_form.addRow("Criar ciclos automaticamente", self.review_cycle_enabled)
+        study_form.addRow("Revisão após 1 hora", self.review_step_1h_enabled)
+        study_form.addRow("Revisão após 24 horas", self.review_step_24h_enabled)
+        study_form.addRow("Revisão após 7 dias", self.review_step_7d_enabled)
+        study_form.addRow("Revisão após 30 dias", self.review_step_30d_enabled)
+        study_form.addRow("Horário preferido", self.preferred_review_time)
+        note = label(
+            "O horário preferido vale para 24h, 7d e 30d. A revisão de 1h mantém o horário exato.",
+            "Weak",
+        )
+        note.setWordWrap(True)
+        study_form.addRow("", note)
         self.layout.addWidget(studies)
 
     def _build_storage_settings(self) -> None:
@@ -239,6 +260,12 @@ class SettingsPage(QWidget):
         self.auto_review.setChecked(bool(self.settings.get("auto_review", False)))
         self.show_explanations.setChecked(bool(self.settings.get("show_explanations_first", False)))
         self.confirm_exit.setChecked(bool(self.settings.get("confirm_exit_exam", True)))
+        self.review_cycle_enabled.setChecked(bool(self.settings.get("review_cycle_enabled", False)))
+        self.review_step_1h_enabled.setChecked(bool(self.settings.get("review_step_1h_enabled", True)))
+        self.review_step_24h_enabled.setChecked(bool(self.settings.get("review_step_24h_enabled", True)))
+        self.review_step_7d_enabled.setChecked(bool(self.settings.get("review_step_7d_enabled", True)))
+        self.review_step_30d_enabled.setChecked(bool(self.settings.get("review_step_30d_enabled", True)))
+        self.preferred_review_time.setText(str(self.settings.get("preferred_review_time", "")))
         self.backup_auto.setChecked(bool(self.settings.get("backup_auto", False)))
         self.developer_mode.blockSignals(True)
         self.developer_mode.setChecked(bool(self.settings.get("developer_mode", False)))
@@ -278,6 +305,12 @@ class SettingsPage(QWidget):
             "question_order": self.question_order.currentText(),
             "show_explanations_first": self.show_explanations.isChecked(),
             "confirm_exit_exam": self.confirm_exit.isChecked(),
+            "review_cycle_enabled": self.review_cycle_enabled.isChecked(),
+            "review_step_1h_enabled": self.review_step_1h_enabled.isChecked(),
+            "review_step_24h_enabled": self.review_step_24h_enabled.isChecked(),
+            "review_step_7d_enabled": self.review_step_7d_enabled.isChecked(),
+            "review_step_30d_enabled": self.review_step_30d_enabled.isChecked(),
+            "preferred_review_time": self.preferred_review_time.text().strip(),
             "data_path": self.data_path.text().strip() or str(self.storage.base_path),
             "backup_auto": self.backup_auto.isChecked(),
             "developer_mode": self.developer_mode.isChecked(),
@@ -285,6 +318,13 @@ class SettingsPage(QWidget):
         }
 
     def _save_settings(self) -> None:
+        preferred_time = self.preferred_review_time.text().strip()
+        if preferred_time:
+            try:
+                datetime.strptime(preferred_time, "%H:%M")
+            except ValueError:
+                show_toast(self, "Use HH:mm para o horário preferido de revisão.", "warning")
+                return
         self.settings = self._collect_settings()
         target_data_path = Path(str(self.settings["data_path"]))
         target_data_path.mkdir(parents=True, exist_ok=True)

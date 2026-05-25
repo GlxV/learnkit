@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from pathlib import Path
 import webbrowser
 
@@ -126,13 +127,18 @@ class DropArea(QLabel):
 
 
 class ImportPage(QWidget):
-    def __init__(self, subjects: list[UISubject], storage: LocalStorage | None = None) -> None:
+    def __init__(
+        self,
+        subjects: list[UISubject],
+        storage: LocalStorage | None = None,
+        settings_provider: Callable[[], Mapping[str, object]] | None = None,
+    ) -> None:
         super().__init__()
         _ = subjects
         self.storage = storage or LocalStorage("data")
         self.generate_prompt_use_case = GeneratePromptUseCase()
         self.parse_ai_response_use_case = ParseAIResponseUseCase()
-        self.import_package_use_case = ImportStudyPackageUseCase(self.storage)
+        self.import_package_use_case = ImportStudyPackageUseCase(self.storage, settings_provider)
         self.study_session_query_service = StudySessionQueryService(self.storage)
 
         self.selected_files: list[Path] = []

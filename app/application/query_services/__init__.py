@@ -1,5 +1,6 @@
 from app.application.query_services.dashboard_query_service import DashboardQueryService
 from app.application.query_services.progress_query_service import ProgressQueryService
+from app.application.query_services.review_cycle_query_service import ReviewCycleQueryService
 from app.application.query_services.search_query_service import SearchQueryService
 from app.application.query_services.study_session_query_service import (
     FlashcardSessionDTO,
@@ -14,6 +15,7 @@ __all__ = [
     "FlashcardSessionDTO",
     "QuestionSessionDTO",
     "ProgressQueryService",
+    "ReviewCycleQueryService",
     "SearchQueryService",
     "StudyBlockContextDTO",
     "StudySessionQueryService",

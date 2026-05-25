@@ -11,6 +11,7 @@ from app.core.models.imported_file import ImportedFile
 from app.core.models.module import Module
 from app.core.models.progress import StudyProgress
 from app.core.models.question import Question
+from app.core.models.review_schedule import ReviewSchedule
 from app.core.models.study_block import StudyBlock
 from app.core.models.subject import Subject
 from app.core.models.summary import Summary
@@ -144,6 +145,20 @@ def progress_from_row(row: sqlite3.Row | None) -> StudyProgress:
             "last_accessed_at": row["last_accessed_at"],
             "updated_at": row["updated_at"],
         }
+    )
+
+
+def review_schedule_from_row(row: sqlite3.Row) -> ReviewSchedule:
+    return ReviewSchedule(
+        id=row["id"],
+        study_block_id=row["study_block_id"],
+        subject_id=row["subject_id"],
+        module_id=row["module_id"],
+        review_step=row["review_step"],
+        scheduled_at=row["scheduled_at"],
+        completed_at=row["completed_at"],
+        status=row["status"],
+        created_at=row["created_at"],
     )
 
 

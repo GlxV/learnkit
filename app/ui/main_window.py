@@ -33,6 +33,7 @@ from app.ui.pages.home_page import HomePage
 from app.ui.pages.import_page import ImportPage
 from app.ui.pages.progress_page import ProgressPage
 from app.ui.pages.questions_page import QuestionsPage
+from app.ui.pages.reviews_page import ReviewsPage
 from app.ui.pages.settings_page import SettingsPage
 from app.ui.pages.studies_page import StudiesPage
 from app.ui.pages.subjects_page import SubjectsPage
@@ -130,12 +131,21 @@ class MainWindow(QMainWindow):
         self.pages = {
             "home": HomePage(self.provider),
             "subjects": SubjectsPage(self.provider),
-            "studies": StudiesPage(self.provider, self.storage),
+            "studies": StudiesPage(
+                self.provider,
+                self.storage,
+                settings_provider=lambda: self.settings,
+            ),
+            "reviews": ReviewsPage(self.provider, self.storage),
             "flashcards": FlashcardsPage(self.provider, self.storage),
             "questions": QuestionsPage(self.provider, self.storage),
             "progress": ProgressPage(self.provider, self.storage),
             "database": DatabasePage(self.storage),
-            "import": ImportPage(self.subjects, self.storage),
+            "import": ImportPage(
+                self.subjects,
+                self.storage,
+                settings_provider=lambda: self.settings,
+            ),
             "settings": settings_page,
         }
         for page in self.pages.values():

@@ -6,6 +6,21 @@ from app.application.dto.progress import (
     ReviewDashboardDTO,
     ReviewDashboardSummaryDTO,
 )
+from app.application.dto.combined_review import (
+    CombinedFlashcardDTO,
+    CombinedQuestionDTO,
+    CombinedReviewBlockDTO,
+    CombinedReviewOriginDTO,
+    CombinedReviewSessionDTO,
+    CombinedReviewSummaryDTO,
+)
+from app.application.dto.review_cycle import (
+    ReviewBlockCycleDTO,
+    ReviewCycleActivationDTO,
+    ReviewQueueDTO,
+    ReviewQueueItemDTO,
+    ReviewSessionDTO,
+)
 from app.application.dto.study_package import (
     FlashcardDTO,
     ImportDestinationDTO,
@@ -24,6 +39,12 @@ from app.application.dto.visual_summary import (
 )
 
 __all__ = [
+    "CombinedFlashcardDTO",
+    "CombinedQuestionDTO",
+    "CombinedReviewBlockDTO",
+    "CombinedReviewOriginDTO",
+    "CombinedReviewSessionDTO",
+    "CombinedReviewSummaryDTO",
     "FlashcardQueueItemDTO",
     "FlashcardDTO",
     "ImportDestinationDTO",
@@ -34,6 +55,11 @@ __all__ = [
     "ReviewDashboardBlockDTO",
     "ReviewDashboardDTO",
     "ReviewDashboardSummaryDTO",
+    "ReviewBlockCycleDTO",
+    "ReviewCycleActivationDTO",
+    "ReviewQueueDTO",
+    "ReviewQueueItemDTO",
+    "ReviewSessionDTO",
     "StudyPackageDTO",
     "StudyPackageImportDTO",
     "SUPPORTED_VISUAL_BLOCK_TYPES",

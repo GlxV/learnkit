@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Mapping
+from datetime import datetime
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -19,13 +21,16 @@ from PySide6.QtWidgets import (
 )
 
 from app.application.query_services.study_session_query_service import StudySessionQueryService
+from app.application.query_services.review_cycle_query_service import ReviewCycleQueryService
 from app.application.query_services.ui_data_provider import UIBlock, UIDataProvider, UIModule, UISubject
 from app.application.use_cases.manage_study_summary import ManageStudySummaryUseCase
+from app.application.use_cases.manage_review_cycle import ManageReviewCycleUseCase
 from app.core.storage.local_storage import LocalStorage
 from app.ui.components.cards import EmptyState, ProgressLine, StatCard, StudyBlockRow, label
 from app.ui.components.summary_visual import PresentationDialog, VisualSummaryWidget
 from app.ui.feedback import log_action, show_toast
 from app.ui.pages.base import panel, scroll_page
+from app.ui.pages.combined_review_dialog import CombinedReviewSessionDialog
 from app.ui.theme import COLORS
 
 
@@ -254,15 +259,27 @@ class SummaryDialog(QDialog):
 
 
 class StudiesPage(QWidget):
-    def __init__(self, provider: UIDataProvider, storage: LocalStorage) -> None:
+    def __init__(
+        self,
+        provider: UIDataProvider,
+        storage: LocalStorage,
+        settings_provider: Callable[[], Mapping[str, object]] | None = None,
+    ) -> None:
         super().__init__()
         self.provider = provider
-        self.study_session_query_service = StudySessionQueryService(storage)
+        self.storage = storage
+        self.settings_provider = settings_provider or (lambda: {})
+        self.study_session_query_service = StudySessionQueryService(storage, self.settings_provider)
         self.summary_use_case = ManageStudySummaryUseCase(storage)
+        self.review_cycle_use_case = ManageReviewCycleUseCase(storage)
+        self.review_cycle_query_service = ReviewCycleQueryService(storage)
         self.subjects: list[UISubject] = []
         self.subject_combo: QComboBox | None = None
         self.module_combo: QComboBox | None = None
         self.selected_block_id: str | None = None
+        self.selected_review_block_ids: set[str] = set()
+        self.selected_subject_name: str | None = None
+        self.selected_module_name: str | None = None
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         scroll, _, self.layout = scroll_page()
@@ -293,42 +310,67 @@ class StudiesPage(QWidget):
             return
 
         self.layout.addLayout(self._filters())
-        selected_blocks = self._filtered_blocks() or blocks
+        selected_blocks = self._filtered_blocks()
+        if not selected_blocks:
+            self.selected_review_block_ids.clear()
+            self.layout.addWidget(
+                EmptyState(
+                    "Nenhum bloco neste módulo.",
+                    "Escolha outro módulo ou importe um novo bloco para estudar.",
+                )
+            )
+            self.layout.addStretch()
+            return
+        visible_ids = {block.id for block in selected_blocks if block.id}
+        self.selected_review_block_ids.intersection_update(visible_ids)
         current = self._best_block(selected_blocks)
         if self.selected_block_id:
             current = next((block for block in selected_blocks if block.id == self.selected_block_id), current)
         self.layout.addWidget(self._continue_card(current))
+        self.layout.addWidget(self._review_cycle_panel(current))
         self.layout.addLayout(self._study_modes(current))
         self.layout.addLayout(self._content_grid(selected_blocks))
 
     def _filters(self) -> QHBoxLayout:
         filters = QHBoxLayout()
         self.subject_combo = QComboBox()
-        self.subject_combo.addItems([subject.name for subject in self.subjects])
+        subject_names = [subject.name for subject in self.subjects]
+        self.subject_combo.addItems(subject_names)
+        if self.selected_subject_name not in subject_names:
+            self.selected_subject_name = subject_names[0] if subject_names else None
+        if self.selected_subject_name:
+            self.subject_combo.setCurrentText(self.selected_subject_name)
         self.module_combo = QComboBox()
-        self.subject_combo.currentTextChanged.connect(self._refresh_modules)
-        self.module_combo.currentTextChanged.connect(lambda: self.refresh())
+        subject = self._selected_subject()
+        module_names = [module.name for module in subject.modules] if subject else []
+        self.module_combo.addItems(module_names)
+        if self.selected_module_name not in module_names:
+            self.selected_module_name = module_names[0] if module_names else None
+        if self.selected_module_name:
+            self.module_combo.setCurrentText(self.selected_module_name)
+        self.subject_combo.currentTextChanged.connect(self._select_subject_scope)
+        self.module_combo.currentTextChanged.connect(self._select_module_scope)
         filters.addWidget(self.subject_combo)
         filters.addWidget(self.module_combo)
         filters.addStretch()
-        self._refresh_modules(rebuild=False)
         return filters
 
-    def _refresh_modules(self, *_args, rebuild: bool = True) -> None:
-        if self.module_combo is None or self.subject_combo is None:
+    def _select_subject_scope(self, subject_name: str) -> None:
+        if subject_name == self.selected_subject_name:
             return
-        subject = self._selected_subject()
-        current = self.module_combo.currentText()
-        self.module_combo.blockSignals(True)
-        self.module_combo.clear()
-        if subject:
-            self.module_combo.addItems([module.name for module in subject.modules])
-        index = self.module_combo.findText(current)
-        if index >= 0:
-            self.module_combo.setCurrentIndex(index)
-        self.module_combo.blockSignals(False)
-        if rebuild:
-            self.refresh()
+        self.selected_subject_name = subject_name
+        self.selected_module_name = None
+        self.selected_block_id = None
+        self.selected_review_block_ids.clear()
+        self.refresh()
+
+    def _select_module_scope(self, module_name: str) -> None:
+        if module_name == self.selected_module_name:
+            return
+        self.selected_module_name = module_name
+        self.selected_block_id = None
+        self.selected_review_block_ids.clear()
+        self.refresh()
 
     def _continue_card(self, block: UIBlock) -> QWidget:
         card = panel()
@@ -375,6 +417,117 @@ class StudiesPage(QWidget):
             modes.addWidget(wrap, 0, index)
         return modes
 
+    def _review_cycle_panel(self, block: UIBlock) -> QWidget:
+        card = panel()
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(10)
+        layout.addWidget(label("Ciclo de Revisão", "SectionTitle"))
+        if not block.id:
+            layout.addWidget(label("Salve este bloco para ativar um ciclo.", "Muted"))
+            return card
+        cycle = self.review_cycle_query_service.block_cycle(block.id)
+        if cycle.total == 0:
+            layout.addWidget(
+                label(
+                    "Nenhuma revisão agendada. Você pode ativar um ciclo somente para este bloco.",
+                    "Muted",
+                )
+            )
+            activate = QPushButton("Ativar Ciclo de Revisão")
+            activate.setObjectName("PrimaryButton")
+            activate.clicked.connect(lambda: self._activate_review_cycle(block.id or ""))
+            layout.addWidget(activate)
+            return card
+        done = cycle.done + cycle.skipped
+        layout.addWidget(label(f"{done} de {cycle.total} revisões encerradas.", "Muted"))
+        if cycle.next_pending is not None:
+            layout.addWidget(
+                label(
+                    f"Próxima revisão: {self._format_review_time(cycle.next_pending.scheduled_at)}",
+                    "SmallTitle",
+                )
+            )
+        else:
+            layout.addWidget(label("Ciclo concluído.", "SmallTitle"))
+        open_queue = QPushButton("Abrir fila de revisões")
+        open_queue.setObjectName("PrimaryButton")
+        open_queue.clicked.connect(lambda: self._navigate("reviews"))
+        layout.addWidget(open_queue)
+        return card
+
+    def _activate_review_cycle(self, block_id: str) -> None:
+        try:
+            result = self.review_cycle_use_case.activate_cycle(
+                block_id,
+                settings=self.settings_provider(),
+                automatic=False,
+            )
+        except ValueError as exc:
+            show_toast(self, str(exc), "warning")
+            return
+        if result.created:
+            show_toast(self, "Ciclo de Revisão ativado para este bloco.", "success")
+            log_action("review_cycle_activated_manually", block_id=block_id)
+        else:
+            show_toast(self, "Este bloco já possui um Ciclo de Revisão.", "info")
+        self.refresh()
+
+    def _format_review_time(self, value: str) -> str:
+        try:
+            return datetime.fromisoformat(value).astimezone().strftime("%d/%m/%Y às %H:%M")
+        except ValueError:
+            return value
+
+    def _combined_review_bar(self) -> QWidget:
+        count = len(self.selected_review_block_ids)
+        bar = QFrame()
+        bar.setObjectName("CombinedSelectionBar")
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(10)
+        layout.addWidget(label(f"{count} blocos selecionados para revisão combinada", "SmallTitle"))
+        layout.addStretch()
+        clear = QPushButton("Limpar seleção")
+        clear.setObjectName("GhostButton")
+        clear.clicked.connect(self._clear_review_selection)
+        review = QPushButton(f"Revisar selecionados ({count})")
+        review.setObjectName("PrimaryButton")
+        review.setEnabled(count >= 2)
+        review.setToolTip("" if count >= 2 else "Selecione pelo menos dois blocos.")
+        review.clicked.connect(self._open_combined_review)
+        layout.addWidget(clear)
+        layout.addWidget(review)
+        return bar
+
+    def _toggle_review_selection(self, block_id: str, selected: bool) -> None:
+        if selected:
+            self.selected_review_block_ids.add(block_id)
+        else:
+            self.selected_review_block_ids.discard(block_id)
+        self.refresh()
+
+    def _clear_review_selection(self) -> None:
+        self.selected_review_block_ids.clear()
+        self.refresh()
+
+    def _open_combined_review(self) -> None:
+        if len(self.selected_review_block_ids) < 2:
+            return
+        block_ids = [
+            block.id
+            for block in self._filtered_blocks()
+            if block.id and block.id in self.selected_review_block_ids
+        ]
+        dialog = CombinedReviewSessionDialog(
+            self.storage,
+            block_ids,
+            settings_provider=self.settings_provider,
+            parent=self,
+        )
+        dialog.exec()
+        self.refresh()
+
     def _content_grid(self, blocks: list[UIBlock]) -> QHBoxLayout:
         content = QHBoxLayout()
         left = QVBoxLayout()
@@ -387,9 +540,16 @@ class StudiesPage(QWidget):
         recent_layout.setContentsMargins(18, 16, 18, 16)
         recent_layout.setSpacing(10)
         recent_layout.addWidget(label("Blocos deste estudo", "SectionTitle"))
-        for block in blocks[:8]:
-            row = StudyBlockRow(block)
+        if self.selected_review_block_ids:
+            recent_layout.addWidget(self._combined_review_bar())
+        for block in blocks:
+            row = StudyBlockRow(
+                block,
+                selectable=True,
+                selected=bool(block.id and block.id in self.selected_review_block_ids),
+            )
             row.open_requested.connect(self.select_block_by_id)
+            row.selection_changed.connect(self._toggle_review_selection)
             recent_layout.addWidget(row)
         left.addWidget(recent)
 
@@ -467,6 +627,10 @@ class StudiesPage(QWidget):
         window = self.window()
         if hasattr(window, "navigate"):
             window.navigate(key)
+
+    def hideEvent(self, event) -> None:  # type: ignore[override]
+        self.selected_review_block_ids.clear()
+        super().hideEvent(event)
 
     def _clear_layout(self, layout) -> None:
         while layout.count():

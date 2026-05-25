@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
+
 from app.application.dto.study_package import (
     ImportStudyPackageResultDTO,
     StudyPackageImportDTO,
@@ -11,11 +13,18 @@ from app.core.models.question import Question
 from app.core.models.summary import Summary
 from app.core.services.progress_service import ProgressService
 from app.core.storage.local_storage import LocalStorage
+from app.application.use_cases.manage_review_cycle import ManageReviewCycleUseCase
 
 
 class ImportStudyPackageUseCase:
-    def __init__(self, storage: LocalStorage) -> None:
+    def __init__(
+        self,
+        storage: LocalStorage,
+        settings_provider: Callable[[], Mapping[str, object]] | None = None,
+    ) -> None:
         self.storage = storage
+        self.settings_provider = settings_provider or (lambda: {})
+        self.review_cycle_use_case = ManageReviewCycleUseCase(storage)
 
     def execute(self, request: StudyPackageImportDTO) -> ImportStudyPackageResultDTO:
         mode = request.mode.strip().lower()
@@ -64,6 +73,11 @@ class ImportStudyPackageUseCase:
         block = self._fill_block(block, request)
         self.storage.save_block(subject, module, block)
         self._sync_progress(block.id)
+        self.review_cycle_use_case.activate_cycle(
+            block.id,
+            settings=self.settings_provider(),
+            automatic=True,
+        )
         _, _, block = self.storage.get_block_by_id(block.id)
         return ImportStudyPackageResultDTO(
             block=block,

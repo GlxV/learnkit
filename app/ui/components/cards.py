@@ -143,12 +143,21 @@ class ModuleCard(QFrame):
 
 class StudyBlockRow(QFrame):
     open_requested = Signal(str)
+    selection_changed = Signal(str, bool)
 
-    def __init__(self, block: UIBlock) -> None:
+    def __init__(
+        self,
+        block: UIBlock,
+        *,
+        selectable: bool = False,
+        selected: bool = False,
+    ) -> None:
         super().__init__()
         self.block = block
-        self.setObjectName("StudyBlockRow")
-        self.setCursor(Qt.CursorShape.PointingHandCursor if block.id else Qt.CursorShape.ArrowCursor)
+        self.setObjectName("SelectedStudyBlockRow" if selected else "StudyBlockRow")
+        self.setCursor(
+            Qt.CursorShape.PointingHandCursor if block.id else Qt.CursorShape.ArrowCursor
+        )
         layout = QHBoxLayout(self)
         layout.setContentsMargins(14, 12, 14, 12)
         layout.setSpacing(14)
@@ -159,6 +168,15 @@ class StudyBlockRow(QFrame):
         layout.addWidget(ProgressLine(block.progress), 1)
         layout.addWidget(label(str(block.flashcards), "Muted"))
         layout.addWidget(label(str(block.questions), "Muted"))
+        if selectable and block.id:
+            selection = QPushButton("Selecionado" if selected else "Selecionar")
+            selection.setObjectName("SelectionChip")
+            selection.setCheckable(True)
+            selection.setChecked(selected)
+            selection.clicked.connect(
+                lambda checked=False: self.selection_changed.emit(block.id or "", checked)
+            )
+            layout.addWidget(selection)
         action = QPushButton("Estudar")
         action.setObjectName("GhostButton")
         if block.id:

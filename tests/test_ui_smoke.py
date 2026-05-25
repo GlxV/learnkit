@@ -15,7 +15,7 @@ def test_main_window_instantiates_offscreen() -> None:
     window = MainWindow()
 
     assert window.windowTitle() == "LearnKit"
-    assert window.stack.count() == 9
+    assert window.stack.count() == 10
 
 
 def test_new_subject_dialog_has_scrollable_hex_icon_controls() -> None:

@@ -15,6 +15,7 @@ NAV_ITEMS = [
     NavItem("home", "Início", "home"),
     NavItem("subjects", "Matérias", "subjects"),
     NavItem("studies", "Estudos", "studies"),
+    NavItem("reviews", "Revisões", "calendar"),
     NavItem("flashcards", "Flashcards", "flashcards"),
     NavItem("questions", "Perguntas", "questions"),
     NavItem("progress", "Progresso", "progress"),

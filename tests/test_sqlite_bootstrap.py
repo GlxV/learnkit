@@ -50,8 +50,20 @@ def test_sqlite_bootstrap_initializes_schema_and_legacy_columns(tmp_path: Path) 
             row["version"]
             for row in db.execute("SELECT version FROM schema_migrations").fetchall()
         }
+        review_table = db.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type = 'table' AND name = 'review_schedules'
+            """
+        ).fetchone()
+        schedules_created_by_migration = db.execute(
+            "SELECT COUNT(*) AS count FROM review_schedules"
+        ).fetchone()["count"]
 
     assert "flashcard_reviews_json" in progress_columns
     assert "question_attempts_json" in progress_columns
     assert migrations_table is not None
     assert 1 in migration_versions
+    assert review_table is not None
+    assert 2 in migration_versions
+    assert schedules_created_by_migration == 0

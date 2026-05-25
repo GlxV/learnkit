@@ -7,6 +7,32 @@ from typing import Callable
 from app.core.models.base import utc_now
 
 
+REVIEW_SCHEDULES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS review_schedules (
+    id TEXT PRIMARY KEY,
+    study_block_id TEXT NOT NULL REFERENCES study_blocks(id) ON DELETE CASCADE,
+    subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    module_id TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+    review_step TEXT NOT NULL CHECK(review_step IN ('1h', '24h', '7d', '30d')),
+    scheduled_at TEXT NOT NULL,
+    completed_at TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'done', 'skipped')),
+    created_at TEXT NOT NULL,
+    UNIQUE(study_block_id, review_step)
+);
+"""
+
+REVIEW_SCHEDULES_STATUS_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_review_schedules_status_scheduled
+ON review_schedules(status, scheduled_at);
+"""
+
+REVIEW_SCHEDULES_BLOCK_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_review_schedules_block
+ON review_schedules(study_block_id);
+"""
+
+
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS subjects (
     id TEXT PRIMARY KEY,
@@ -91,7 +117,7 @@ CREATE TABLE IF NOT EXISTS study_progress (
     last_accessed_at TEXT,
     updated_at TEXT NOT NULL
 );
-"""
+""" + REVIEW_SCHEDULES_TABLE_SQL + REVIEW_SCHEDULES_STATUS_INDEX_SQL + REVIEW_SCHEDULES_BLOCK_INDEX_SQL
 
 
 SCHEMA_MIGRATIONS_SQL = """
@@ -128,6 +154,15 @@ DEFAULT_MIGRATIONS = (
         name="add_progress_review_json_columns",
         statements=(),
         operation=_add_progress_review_json_columns,
+    ),
+    Migration(
+        version=2,
+        name="add_review_schedules_table",
+        statements=(
+            REVIEW_SCHEDULES_TABLE_SQL,
+            REVIEW_SCHEDULES_STATUS_INDEX_SQL,
+            REVIEW_SCHEDULES_BLOCK_INDEX_SQL,
+        ),
     ),
 )
 

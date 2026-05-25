@@ -5,6 +5,7 @@ from app.core.models.imported_file import ImportedFile
 from app.core.models.module import Module
 from app.core.models.question import Question
 from app.core.models.progress import AggregateProgress, StudyProgress
+from app.core.models.review_schedule import ReviewSchedule
 from app.core.models.study_block import StudyBlock
 from app.core.models.study_record import StudyRecord
 from app.core.models.subject import Subject
@@ -19,6 +20,7 @@ __all__ = [
     "Question",
     "AggregateProgress",
     "StudyProgress",
+    "ReviewSchedule",
     "StudyBlock",
     "StudyRecord",
     "Subject",

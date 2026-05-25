@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app.core.models.module import Module
 from app.core.models.progress import StudyProgress
+from app.core.models.review_schedule import ReviewSchedule
 from app.core.models.study_block import StudyBlock
 from app.core.models.subject import Subject
 from app.core.storage.local_storage import slugify
@@ -15,6 +16,7 @@ from app.infrastructure.sqlite.queries.dashboard_queries import DashboardQueries
 from app.infrastructure.sqlite.repositories.block_repository import BlockRepository
 from app.infrastructure.sqlite.repositories.module_repository import ModuleRepository
 from app.infrastructure.sqlite.repositories.progress_repository import ProgressRepository
+from app.infrastructure.sqlite.repositories.review_schedule_repository import ReviewScheduleRepository
 from app.infrastructure.sqlite.repositories.subject_repository import SubjectRepository
 
 
@@ -31,6 +33,7 @@ class SQLiteStorage:
         self.module_repository = ModuleRepository(self.connect)
         self.block_repository = BlockRepository(self.connect)
         self.progress_repository = ProgressRepository(self.connect)
+        self.review_schedule_repository = ReviewScheduleRepository(self.connect)
         self.bootstrap = SQLiteBootstrap(self.connect)
         self.bootstrap.initialize()
         if migrate_json:
@@ -160,6 +163,29 @@ class SQLiteStorage:
 
     def save_progress(self, block_id: str, progress: StudyProgress) -> StudyProgress:
         return self.progress_repository.save(block_id, progress)
+
+    def create_review_schedules(self, schedules: list[ReviewSchedule]) -> list[ReviewSchedule]:
+        return self.review_schedule_repository.create_many(schedules)
+
+    def list_review_schedules(self, block_id: str) -> list[ReviewSchedule]:
+        return self.review_schedule_repository.list_for_block(block_id)
+
+    def list_pending_review_schedules(self) -> list[ReviewSchedule]:
+        return self.review_schedule_repository.list_by_status("pending")
+
+    def get_review_schedule(self, schedule_id: str) -> ReviewSchedule:
+        schedule = self.review_schedule_repository.get(schedule_id)
+        if schedule is None:
+            raise ValueError(f"Revisao nao encontrada: {schedule_id}")
+        return schedule
+
+    def update_review_schedule_status(
+        self,
+        schedule_id: str,
+        status: str,
+        completed_at: str,
+    ) -> ReviewSchedule:
+        return self.review_schedule_repository.update_status(schedule_id, status, completed_at)
 
     def database_stats(self) -> dict[str, int]:
         return self.dashboard_queries.database_stats()
