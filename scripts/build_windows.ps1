@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.1.1",
+    [string]$Version = "0.1.2",
     [string]$ReleaseUrl = "https://github.com/GlxV/learnkit/releases/tag/v$Version",
     [string]$Python = ".\.venv\Scripts\python.exe"
 )
