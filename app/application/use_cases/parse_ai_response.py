@@ -51,30 +51,43 @@ class ParseAIResponseUseCase:
         if not isinstance(data, dict):
             return None
         schema_version = str(data.get("schema_version", "learnkit.study_package.v1"))
+        parser_warnings = self._warning_list(data.get("parser_warnings", []))
+        flashcard_items = self._object_list(
+            data.get("flashcards", []), "flashcards", parser_warnings
+        )
+        question_items = self._object_list(
+            data.get("questions", []), "questions", parser_warnings
+        )
         flashcards = [
             FlashcardDTO(
                 front=str(item.get("front", "")),
                 back=str(item.get("back", "")),
-                source=item.get("source"),
+                source=(str(item["source"]) if item.get("source") is not None else None),
             )
-            for item in data.get("flashcards", [])
-            if isinstance(item, dict)
+            for item in flashcard_items
         ]
-        questions = [
-            QuestionDTO(
-                statement=str(item.get("statement", "")),
-                alternatives={
-                    str(key): str(value)
-                    for key, value in dict(item.get("alternatives", {})).items()
-                },
-                correct_answer=str(item.get("correct_answer", "")),
-                explanation=(
-                    str(item["explanation"]) if item.get("explanation") is not None else None
-                ),
+        questions: list[QuestionDTO] = []
+        for index, item in enumerate(question_items, start=1):
+            raw_alternatives = item.get("alternatives", {})
+            if not isinstance(raw_alternatives, dict):
+                parser_warnings.append(
+                    f"Pergunta {index} possui alternatives em formato inválido."
+                )
+                raw_alternatives = {}
+            questions.append(
+                QuestionDTO(
+                    statement=str(item.get("statement", "")),
+                    alternatives={
+                        str(key): str(value) for key, value in raw_alternatives.items()
+                    },
+                    correct_answer=str(item.get("correct_answer", "")),
+                    explanation=(
+                        str(item["explanation"])
+                        if item.get("explanation") is not None
+                        else None
+                    ),
+                )
             )
-            for item in data.get("questions", [])
-            if isinstance(item, dict)
-        ]
         summary_visual = data.get("summary_visual", "")
         return StudyPackageDTO(
             schema_version=schema_version,
@@ -82,12 +95,30 @@ class ParseAIResponseUseCase:
             summary_visual=dump_visual_summary(summary_visual),
             flashcards=flashcards,
             questions=questions,
-            parser_warnings=[
-                str(warning)
-                for warning in data.get("parser_warnings", [])
-                if str(warning).strip()
-            ],
+            parser_warnings=parser_warnings,
         )
+
+    def _object_list(
+        self,
+        value: object,
+        field_name: str,
+        warnings: list[str],
+    ) -> list[dict[str, object]]:
+        if not isinstance(value, list):
+            warnings.append(f"Campo {field_name} precisa ser uma lista.")
+            return []
+        items: list[dict[str, object]] = []
+        for index, item in enumerate(value, start=1):
+            if isinstance(item, dict):
+                items.append(item)
+            else:
+                warnings.append(f"Item {index} de {field_name} foi ignorado por formato inválido.")
+        return items
+
+    def _warning_list(self, value: object) -> list[str]:
+        if not isinstance(value, list):
+            return ["Campo parser_warnings precisa ser uma lista."]
+        return [str(warning).strip() for warning in value if str(warning).strip()]
 
     def _strip_json_fence(self, raw: str) -> str:
         if not raw.startswith("```"):
