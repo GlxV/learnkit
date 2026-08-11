@@ -120,3 +120,25 @@ def test_normalized_question_persists_with_usable_alternatives(tmp_path) -> None
         "D": "Quatro",
     }
     assert loaded.questions[0].correct_answer == "A"
+
+
+def test_json_parser_rejects_non_text_values_in_semantic_fields() -> None:
+    package = ParseAIResponseUseCase().execute(
+        '{"summary_text":null,'
+        '"summary_visual":3,'
+        '"flashcards":[{"front":null,"back":123}],'
+        '"questions":[{"statement":false,'
+        '"alternatives":{"A":null,"B":2,"C":{},"D":[]},'
+        '"correct_answer":1}]}'
+    )
+
+    report = ValidateStudyPackageUseCase().execute(package)
+
+    assert report.can_save is False
+    assert report.summary_found is False
+    assert report.flashcards_total == 1
+    assert report.flashcards_valid == 0
+    assert report.questions_total == 1
+    assert report.questions_valid == 0
+    assert report.fatal_issues
+    assert report.warning_issues

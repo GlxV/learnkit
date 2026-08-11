@@ -50,22 +50,40 @@ class ParseAIResponseUseCase:
             return None
         if not isinstance(data, dict):
             return None
-        schema_version = str(data.get("schema_version", "learnkit.study_package.v1"))
         parser_warnings = self._warning_list(data.get("parser_warnings", []))
+        raw_schema_version = data.get("schema_version", "learnkit.study_package.v1")
+        if isinstance(raw_schema_version, str):
+            schema_version = raw_schema_version
+        else:
+            schema_version = "learnkit.study_package.v1"
+            parser_warnings.append("Campo schema_version precisa ser texto.")
         flashcard_items = self._object_list(
             data.get("flashcards", []), "flashcards", parser_warnings
         )
         question_items = self._object_list(
             data.get("questions", []), "questions", parser_warnings
         )
-        flashcards = [
-            FlashcardDTO(
-                front=str(item.get("front", "")),
-                back=str(item.get("back", "")),
-                source=(str(item["source"]) if item.get("source") is not None else None),
+        flashcards: list[FlashcardDTO] = []
+        for index, item in enumerate(flashcard_items, start=1):
+            flashcards.append(
+                FlashcardDTO(
+                    front=self._text_value(
+                        item.get("front", ""),
+                        f"flashcards[{index}].front",
+                        parser_warnings,
+                    ),
+                    back=self._text_value(
+                        item.get("back", ""),
+                        f"flashcards[{index}].back",
+                        parser_warnings,
+                    ),
+                    source=self._optional_text_value(
+                        item.get("source"),
+                        f"flashcards[{index}].source",
+                        parser_warnings,
+                    ),
+                )
             )
-            for item in flashcard_items
-        ]
         questions: list[QuestionDTO] = []
         for index, item in enumerate(question_items, start=1):
             raw_alternatives = item.get("alternatives", {})
@@ -74,24 +92,44 @@ class ParseAIResponseUseCase:
                     f"Pergunta {index} possui alternatives em formato inválido."
                 )
                 raw_alternatives = {}
+            alternatives: dict[str, str] = {}
+            for key, value in raw_alternatives.items():
+                alternatives[str(key)] = self._text_value(
+                    value,
+                    f"questions[{index}].alternatives.{key}",
+                    parser_warnings,
+                )
             questions.append(
                 QuestionDTO(
-                    statement=str(item.get("statement", "")),
-                    alternatives={
-                        str(key): str(value) for key, value in raw_alternatives.items()
-                    },
-                    correct_answer=str(item.get("correct_answer", "")),
-                    explanation=(
-                        str(item["explanation"])
-                        if item.get("explanation") is not None
-                        else None
+                    statement=self._text_value(
+                        item.get("statement", ""),
+                        f"questions[{index}].statement",
+                        parser_warnings,
+                    ),
+                    alternatives=alternatives,
+                    correct_answer=self._text_value(
+                        item.get("correct_answer", ""),
+                        f"questions[{index}].correct_answer",
+                        parser_warnings,
+                    ),
+                    explanation=self._optional_text_value(
+                        item.get("explanation"),
+                        f"questions[{index}].explanation",
+                        parser_warnings,
                     ),
                 )
             )
         summary_visual = data.get("summary_visual", "")
+        if not isinstance(summary_visual, (str, dict)) and summary_visual is not None:
+            parser_warnings.append("Campo summary_visual possui formato inválido.")
+            summary_visual = ""
         return StudyPackageDTO(
             schema_version=schema_version,
-            summary_text=str(data.get("summary_text", "")),
+            summary_text=self._text_value(
+                data.get("summary_text", ""),
+                "summary_text",
+                parser_warnings,
+            ),
             summary_visual=dump_visual_summary(summary_visual),
             flashcards=flashcards,
             questions=questions,
@@ -119,6 +157,27 @@ class ParseAIResponseUseCase:
         if not isinstance(value, list):
             return ["Campo parser_warnings precisa ser uma lista."]
         return [str(warning).strip() for warning in value if str(warning).strip()]
+
+    def _text_value(
+        self,
+        value: object,
+        field_name: str,
+        warnings: list[str],
+    ) -> str:
+        if isinstance(value, str):
+            return value
+        warnings.append(f"Campo {field_name} precisa ser texto.")
+        return ""
+
+    def _optional_text_value(
+        self,
+        value: object,
+        field_name: str,
+        warnings: list[str],
+    ) -> str | None:
+        if value is None:
+            return None
+        return self._text_value(value, field_name, warnings)
 
     def _strip_json_fence(self, raw: str) -> str:
         if not raw.startswith("```"):
