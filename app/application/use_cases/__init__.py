@@ -6,6 +6,7 @@ from app.application.use_cases.manage_study_summary import ManageStudySummaryUse
 from app.application.use_cases.manage_review_cycle import ManageReviewCycleUseCase
 from app.application.use_cases.parse_ai_response import ParseAIResponseUseCase
 from app.application.use_cases.review_flashcard import ReviewFlashcardUseCase
+from app.application.use_cases.validate_study_package import ValidateStudyPackageUseCase
 
 __all__ = [
     "AnswerQuestionUseCase",
@@ -16,4 +17,5 @@ __all__ = [
     "ManageReviewCycleUseCase",
     "ParseAIResponseUseCase",
     "ReviewFlashcardUseCase",
+    "ValidateStudyPackageUseCase",
 ]

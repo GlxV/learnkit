@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
@@ -28,12 +29,14 @@ from PySide6.QtWidgets import (
 )
 
 from app.application.dto.study_package import ImportDestinationDTO, StudyPackageDTO, StudyPackageImportDTO
+from app.application.dto.study_package_validation import StudyPackageValidationDTO
 from app.application.dto.visual_preset import visual_preset_options
 from app.application.query_services.study_session_query_service import StudySessionQueryService
 from app.application.query_services.ui_data_provider import UISubject
 from app.application.use_cases.generate_prompt import GeneratePromptUseCase
 from app.application.use_cases.import_study_package import ImportStudyPackageUseCase
 from app.application.use_cases.parse_ai_response import ParseAIResponseUseCase
+from app.application.use_cases.validate_study_package import ValidateStudyPackageUseCase
 from app.core.extractors.file_extractor import FileExtractionResult, FileExtractor
 from app.core.models.study_block import StudyBlock
 from app.core.prompt.prompt_builder import PromptOptions
@@ -151,6 +154,7 @@ class ImportPage(QWidget):
         self.storage = storage or LocalStorage("data")
         self.generate_prompt_use_case = GeneratePromptUseCase()
         self.parse_ai_response_use_case = ParseAIResponseUseCase()
+        self.validate_study_package_use_case = ValidateStudyPackageUseCase()
         self.import_package_use_case = ImportStudyPackageUseCase(self.storage, settings_provider)
         self.study_session_query_service = StudySessionQueryService(self.storage)
 
@@ -159,6 +163,7 @@ class ImportPage(QWidget):
         self.extraction_result: FileExtractionResult | None = None
         self.prompt_text = ""
         self.parsed_response: StudyPackageDTO | None = None
+        self.validation_report: StudyPackageValidationDTO | None = None
         self.current_block: StudyBlock | None = None
         self.worker_thread: QThread | None = None
         self.worker: ExtractionWorker | None = None
@@ -218,7 +223,7 @@ class ImportPage(QWidget):
         header = QHBoxLayout()
         header.addWidget(label("Contexto do pacote", "SectionTitle"))
         header.addStretch()
-        self.advanced_import_button = QPushButton("Importacao avancada")
+        self.advanced_import_button = QPushButton("Opções avançadas")
         self.advanced_import_button.clicked.connect(self._toggle_advanced_import)
         header.addWidget(self.advanced_import_button)
         layout.addLayout(header)
@@ -494,7 +499,7 @@ class ImportPage(QWidget):
         self.choose_button.clicked.connect(self._choose_files)
         clear = QPushButton("Limpar lista")
         clear.clicked.connect(self._clear_files)
-        self.options_button = QPushButton("Opcoes avancadas")
+        self.options_button = QPushButton("Opções avançadas")
         self.options_button.clicked.connect(self._toggle_options)
         actions.addWidget(self.choose_button)
         actions.addWidget(clear)
@@ -669,6 +674,7 @@ class ImportPage(QWidget):
         self.ai_response = QPlainTextEdit()
         self.ai_response.setPlaceholderText("Cole aqui o JSON ou Markdown retornado pela IA")
         self.ai_response.setMinimumHeight(220)
+        self.ai_response.textChanged.connect(self._invalidate_response_validation)
         layout.addWidget(self.ai_response)
         self._build_validation_card(layout)
         layout.addLayout(
@@ -697,9 +703,10 @@ class ImportPage(QWidget):
         grid.setVerticalSpacing(8)
         self.validation_summary_text = self._validation_metric("Resumo texto", "nao")
         self.validation_visual_text = self._validation_metric("Resumo visual", "nao")
-        self.validation_flashcards_text = self._validation_metric("Flashcards", "0")
-        self.validation_questions_text = self._validation_metric("Perguntas", "0")
+        self.validation_flashcards_text = self._validation_metric("Flashcards válidos", "0/0")
+        self.validation_questions_text = self._validation_metric("Perguntas válidas", "0/0")
         self.validation_warnings_text = self._validation_metric("Avisos", "0")
+        self.validation_info_text = self._validation_metric("Informações", "0")
         for index, metric in enumerate(
             [
                 self.validation_summary_text,
@@ -707,12 +714,24 @@ class ImportPage(QWidget):
                 self.validation_flashcards_text,
                 self.validation_questions_text,
                 self.validation_warnings_text,
+                self.validation_info_text,
             ]
         ):
             grid.addWidget(metric, index // 3, index % 3)
         layout.addLayout(grid)
+        self.validation_level = label("Aguardando validação da resposta.", "Muted")
+        layout.addWidget(self.validation_level)
+        self.validation_fatal_text = label("", "Muted")
+        self.validation_fatal_text.setWordWrap(True)
+        self.validation_fatal_text.setStyleSheet(f"color: {COLORS['red']};")
+        self.validation_fatal_text.setVisible(False)
+        layout.addWidget(self.validation_fatal_text)
         self.response_status = label("Aguardando resposta da IA.", "Muted")
         layout.addWidget(self.response_status)
+        self.validation_details_button = QPushButton("Ver detalhes da validação")
+        self.validation_details_button.setEnabled(False)
+        self.validation_details_button.clicked.connect(self._show_validation_details)
+        layout.addWidget(self.validation_details_button)
         parent_layout.addWidget(self.validation_card)
 
     def _validation_metric(self, title: str, value: str) -> QFrame:
@@ -732,6 +751,83 @@ class ImportPage(QWidget):
         labels = frame.findChildren(QLabel)
         if labels:
             labels[-1].setText(value)
+
+    def _invalidate_response_validation(self) -> None:
+        if self.parsed_response is None and self.validation_report is None:
+            return
+        self.parsed_response = None
+        self.validation_report = None
+        if hasattr(self, "save_button"):
+            self.save_button.setEnabled(False)
+            self.save_button.setToolTip("Valide a resposta da IA antes de salvar.")
+        if hasattr(self, "validation_details_button"):
+            self.validation_details_button.setEnabled(False)
+            self.validation_details_button.setText("Ver detalhes da validação")
+        if hasattr(self, "validation_fatal_text"):
+            self.validation_fatal_text.clear()
+            self.validation_fatal_text.setVisible(False)
+        if hasattr(self, "validation_level"):
+            self.validation_level.setText("Resposta alterada; valide novamente.")
+        if hasattr(self, "response_status"):
+            self.response_status.setText("Aguardando nova validação da resposta da IA.")
+        if hasattr(self, "_set_step_status"):
+            self._set_step_status(4, "active")
+        self._update_context_card()
+
+    def _render_validation_report(self, report: StudyPackageValidationDTO) -> None:
+        summary_value = "sim" if report.summary_found else "não"
+        if report.visual_valid:
+            visual_value = "sim"
+        elif report.package.summary_visual.strip():
+            visual_value = "⚠ inválido"
+        else:
+            visual_value = "— não encontrado"
+        self._set_validation_metric(self.validation_summary_text, summary_value)
+        self._set_validation_metric(self.validation_visual_text, visual_value)
+        self._set_validation_metric(
+            self.validation_flashcards_text,
+            _validation_count(report.flashcards_valid, report.flashcards_total),
+        )
+        self._set_validation_metric(
+            self.validation_questions_text,
+            _validation_count(report.questions_valid, report.questions_total),
+        )
+        self._set_validation_metric(self.validation_warnings_text, str(len(report.warning_issues)))
+        self._set_validation_metric(self.validation_info_text, str(len(report.info_issues)))
+
+        fatal_messages = [issue.message for issue in report.fatal_issues]
+        self.validation_fatal_text.setText("Erro fatal: " + " | ".join(fatal_messages))
+        self.validation_fatal_text.setVisible(bool(fatal_messages))
+        detail_count = len(report.issues)
+        self.validation_details_button.setText(f"Ver detalhes da validação ({detail_count})")
+        self.validation_details_button.setEnabled(detail_count > 0)
+        if fatal_messages:
+            self.validation_level.setText("Erro fatal: o pacote não pode ser salvo.")
+            self.validation_level.setStyleSheet(f"color: {COLORS['red']}; font-weight: 800;")
+        elif report.warning_issues:
+            self.validation_level.setText("Pacote utilizável com avisos; confirme antes de salvar.")
+            self.validation_level.setStyleSheet(f"color: {COLORS['amber']}; font-weight: 800;")
+        else:
+            self.validation_level.setText("Pacote válido e pronto para salvar.")
+            self.validation_level.setStyleSheet(f"color: {COLORS['green']}; font-weight: 800;")
+
+    def _show_validation_details(self) -> None:
+        if self.validation_report is None:
+            return
+        grouped = {
+            "fatal": "ERROS FATAIS",
+            "warning": "AVISOS",
+            "info": "INFORMAÇÕES",
+        }
+        lines: list[str] = []
+        for severity in ("fatal", "warning", "info"):
+            issues = [issue.message for issue in self.validation_report.issues if issue.severity == severity]
+            if not issues:
+                continue
+            lines.append(grouped[severity])
+            lines.extend(f"- {message}" for message in issues)
+            lines.append("")
+        QMessageBox.information(self, "Detalhes da validação", "\n".join(lines).strip())
 
     def _build_result(self) -> None:
         page = QWidget()
@@ -955,7 +1051,7 @@ class ImportPage(QWidget):
         visible = not self.advanced_import_panel.isVisible()
         self.advanced_import_panel.setVisible(visible)
         self.advanced_import_button.setText(
-            "Ocultar importacao avancada" if visible else "Importacao avancada"
+            "Ocultar opções avançadas" if visible else "Opções avançadas"
         )
         if visible:
             self._show_wizard_step(2)
@@ -1216,7 +1312,7 @@ class ImportPage(QWidget):
     def _toggle_options(self) -> None:
         visible = not self.options_panel.isVisible()
         self.options_panel.setVisible(visible)
-        self.options_button.setText("Ocultar opcoes" if visible else "Opcoes avancadas")
+        self.options_button.setText("Ocultar opções" if visible else "Opções avançadas")
 
     def _generate_prompt(self) -> None:
         if not self.extraction_result or not self.extraction_result.combined_content.text.strip():
@@ -1264,58 +1360,48 @@ class ImportPage(QWidget):
     def _validate_response(self) -> None:
         raw = self.ai_response.toPlainText().strip()
         if not raw:
+            self.parsed_response = None
+            self.validation_report = None
+            self.save_button.setEnabled(False)
             self._set_step_status(4, "warning")
             show_toast(self, "Cole a resposta da IA primeiro.", "warning")
             return
+
         parsed = self.parse_ai_response_use_case.execute(raw)
-        has_summary = bool(parsed.summary_text.strip())
-        has_visual = bool(parsed.summary_visual.strip())
-        has_content = has_summary or has_visual or bool(parsed.flashcards) or bool(parsed.questions)
-        if not has_content:
+        report = self.validate_study_package_use_case.execute(parsed)
+        self.validation_report = report
+        self._render_validation_report(report)
+        if not report.can_save:
             self.parsed_response = None
             self.save_button.setEnabled(False)
-            self._set_step_status(4, "error")
-            self._set_validation_metric(self.validation_summary_text, "nao")
-            self._set_validation_metric(self.validation_visual_text, "nao")
-            self._set_validation_metric(self.validation_flashcards_text, str(len(parsed.flashcards)))
-            self._set_validation_metric(self.validation_questions_text, str(len(parsed.questions)))
-            self._set_validation_metric(self.validation_warnings_text, str(len(parsed.parser_warnings)))
-            self.response_status.setText("Não foi possível identificar conteúdo válido na resposta.")
+            self.save_button.setToolTip("Corrija a resposta antes de salvar.")
             self.response_status.setText(
-                "Nao encontrei resumo, flashcards ou perguntas. Confira se voce colou a resposta completa da IA."
+                "Não encontrei resumo, flashcards ou perguntas utilizáveis. Confira a resposta completa da IA."
             )
-            show_toast(self, "Resposta sem resumo, flashcards ou perguntas reconheciveis.", "error")
-            log_action("ai_response_validation_failed", warnings=len(parsed.parser_warnings))
+            self._set_step_status(4, "error")
+            show_toast(self, "A resposta contém um erro fatal e não pode ser salva.", "error")
+            log_action("ai_response_validation_failed", warnings=len(report.warning_issues))
             self._update_context_card()
             return
 
-        self.parsed_response = parsed
-        self.response_status.setText(
-            f"Resumo texto: {'sim' if has_summary else 'nao'} - "
-            f"Resumo visual: {'sim' if has_visual else 'nao'} - "
-            f"{len(parsed.flashcards)} flashcards - {len(parsed.questions)} perguntas - "
-            f"{len(parsed.parser_warnings)} avisos"
+        self.parsed_response = report.usable_package
+        self.save_button.setEnabled(True)
+        self.save_button.setToolTip(
+            "" if not report.warning_issues else "Salvar exigirá confirmação dos avisos."
         )
-        self._set_validation_metric(self.validation_summary_text, "sim" if has_summary else "nao")
-        self._set_validation_metric(self.validation_visual_text, "sim" if has_visual else "nao")
-        self._set_validation_metric(self.validation_flashcards_text, str(len(parsed.flashcards)))
-        self._set_validation_metric(self.validation_questions_text, str(len(parsed.questions)))
-        self._set_validation_metric(self.validation_warnings_text, str(len(parsed.parser_warnings)))
-        if parsed.parser_warnings:
-            self.response_status.setText(
-                "Pacote aproveitavel, mas revise os avisos: " + "; ".join(parsed.parser_warnings[:3])
-            )
+        if report.warning_issues:
+            self.response_status.setText("Pacote utilizável, mas revise os avisos antes de salvar.")
+            self._set_step_status(4, "warning")
+            show_toast(self, "Resposta validada com avisos.", "warning")
         else:
             self.response_status.setText("Pacote validado. Tudo pronto para salvar o bloco.")
-        self.save_button.setEnabled(True)
-        self.save_button.setToolTip("")
-        self._set_step_status(4, "warning" if parsed.parser_warnings else "done")
-        show_toast(self, "Resposta validada. Agora salve o bloco.", "success")
+            self._set_step_status(4, "done")
+            show_toast(self, "Resposta validada. Agora salve o bloco.", "success")
         log_action(
             "ai_response_validated",
-            flashcards=len(parsed.flashcards),
-            questions=len(parsed.questions),
-            warnings=len(parsed.parser_warnings),
+            flashcards=report.flashcards_valid,
+            questions=report.questions_valid,
+            warnings=len(report.warning_issues),
         )
         self._update_context_card()
 
@@ -1329,6 +1415,18 @@ class ImportPage(QWidget):
         if self.parsed_response is None:
             self._validate_response()
             if self.parsed_response is None:
+                return
+        if self.validation_report and self.validation_report.warning_issues:
+            warning_count = len(self.validation_report.warning_issues)
+            decision = QMessageBox.question(
+                self,
+                "Salvar pacote com avisos",
+                f"A validação encontrou {warning_count} aviso(s). Os itens incompletos serão ignorados. Deseja salvar mesmo assim?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if decision != QMessageBox.StandardButton.Yes:
+                log_action("ai_response_save_cancelled_for_warnings", warnings=warning_count)
                 return
 
         subject_name = self.subject_combo.currentText().strip()
@@ -1417,3 +1515,7 @@ class ImportPage(QWidget):
             window.open_block(self.current_block.id, key)
         elif hasattr(window, "navigate"):
             window.navigate(key)
+
+
+def _validation_count(valid: int, total: int) -> str:
+    return str(valid) if valid == total else f"{valid}/{total}"

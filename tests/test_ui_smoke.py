@@ -295,3 +295,63 @@ def test_import_page_validation_card_updates_from_json_response(tmp_path, monkey
     assert "sim" in metric_values
     assert "1" in metric_values
     assert "Pacote validado" in page.response_status.text()
+
+
+def test_import_page_validation_separates_warnings_and_filters_invalid_items(tmp_path, monkeypatch) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from PySide6.QtWidgets import QApplication, QLabel
+
+    from app.core.database.sqlite_storage import SQLiteStorage
+    import app.ui.pages.import_page as import_page_module
+    from app.ui.pages.import_page import ImportPage
+    from app.ui.theme import apply_app_theme
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_app_theme(app)
+    monkeypatch.setattr(import_page_module, "show_toast", lambda *args, **kwargs: None)
+    storage = SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False)
+    page = ImportPage([], storage)
+    page.ai_response.setPlainText(
+        '{"summary_text":"Resumo", "flashcards":[{"front":"F","back":"R"}],'
+        '"questions":[{"statement":"Valida?","alternatives":{"A":"A","B":"B","C":"C","D":"D"},"correct_answer":"A"},'
+        '{"statement":"Incompleta?","alternatives":{"A":"A"},"correct_answer":"A"}]}'
+    )
+
+    page._validate_response()
+    metric_values = [label.text() for label in page.validation_card.findChildren(QLabel)]
+
+    assert page.validation_report is not None
+    assert len(page.validation_report.warning_issues) == 1
+    assert page.parsed_response is not None
+    assert len(page.parsed_response.questions) == 1
+    assert page.save_button.isEnabled()
+    assert "1/2" in metric_values
+    assert page.validation_details_button.isEnabled()
+
+
+def test_import_page_prepare_button_orchestrates_existing_steps(tmp_path, monkeypatch) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from types import SimpleNamespace
+    from PySide6.QtWidgets import QApplication
+
+    from app.core.database.sqlite_storage import SQLiteStorage
+    import app.ui.pages.import_page as import_page_module
+    from app.ui.pages.import_page import ImportPage
+    from app.ui.theme import apply_app_theme
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_app_theme(app)
+    monkeypatch.setattr(import_page_module, "show_toast", lambda *args, **kwargs: None)
+    storage = SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False)
+    page = ImportPage([], storage)
+    page.extraction_result = SimpleNamespace(combined_content=SimpleNamespace(text="conteúdo"))
+    events: list[str] = []
+    page._generate_prompt = lambda: events.append("prompt")
+    page._copy_prompt = lambda: events.append("copy")
+    page._open_external_ai = lambda: events.append("open")
+
+    page._finish_prepare_study_package()
+
+    assert events == ["prompt", "copy", "open"]

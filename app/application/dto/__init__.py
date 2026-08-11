@@ -29,6 +29,10 @@ from app.application.dto.study_package import (
     StudyPackageDTO,
     StudyPackageImportDTO,
 )
+from app.application.dto.study_package_validation import (
+    StudyPackageValidationDTO,
+    ValidationIssueDTO,
+)
 from app.application.dto.visual_summary import (
     SUPPORTED_VISUAL_BLOCK_TYPES,
     dump_visual_summary,
@@ -62,6 +66,8 @@ __all__ = [
     "ReviewSessionDTO",
     "StudyPackageDTO",
     "StudyPackageImportDTO",
+    "StudyPackageValidationDTO",
+    "ValidationIssueDTO",
     "SUPPORTED_VISUAL_BLOCK_TYPES",
     "dump_visual_summary",
     "normalize_visual_block",
