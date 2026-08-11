@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QFileDialog,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -32,6 +33,7 @@ from app.ui.feedback import log_action, show_toast
 from app.ui.pages.base import panel, scroll_page
 from app.ui.pages.combined_review_dialog import CombinedReviewSessionDialog
 from app.ui.pages.exam_review_dialog import ExamReviewSelectionDialog
+from app.ui.services.visual_summary_exporter import VisualSummaryExportService
 from app.ui.theme import COLORS
 
 
@@ -128,6 +130,7 @@ class SummaryDialog(QDialog):
         super().__init__(parent)
         self.study_session_query_service = study_session_query_service
         self.summary_use_case = summary_use_case
+        self.visual_export_service = VisualSummaryExportService()
         context = self.study_session_query_service.block_context(block_id)
         self.subject, self.module, self.block = context.subject, context.module, context.block
         self.setWindowTitle(f"Resumo - {self.block.title}")
@@ -171,13 +174,38 @@ class SummaryDialog(QDialog):
         self.visual_button.clicked.connect(lambda: self._set_mode("visual"))
         copy = QPushButton("Copiar")
         copy.clicked.connect(self._copy_current)
+        copy_image = QPushButton("Copiar imagem")
+        copy_image.clicked.connect(self._copy_visual_image)
+        copy_image.setEnabled(bool(self.block.summary_visual.strip()))
+        copy_image.setToolTip("Copia o resumo visual renderizado como imagem.")
+        self.copy_image = copy_image
+        export_png = QPushButton("Salvar PNG")
+        export_png.clicked.connect(self._export_png)
+        export_png.setEnabled(bool(self.block.summary_visual.strip()))
+        self.export_png = export_png
+        export_pdf = QPushButton("Salvar PDF")
+        export_pdf.clicked.connect(self._export_pdf)
+        export_pdf.setEnabled(bool(self.block.summary_visual.strip()))
+        self.export_pdf = export_pdf
         edit = QPushButton("Editar")
         edit.clicked.connect(self._edit_summary)
         self.presentation = QPushButton("Modo apresentação")
         self.presentation.clicked.connect(self._open_presentation)
         self.presentation.setEnabled(bool(self.block.summary_visual.strip()))
+        self.copy_image.setEnabled(bool(self.block.summary_visual.strip()))
+        self.export_png.setEnabled(bool(self.block.summary_visual.strip()))
+        self.export_pdf.setEnabled(bool(self.block.summary_visual.strip()))
         self.presentation.setToolTip("" if self.presentation.isEnabled() else "Disponível quando houver resumo visual.")
-        for widget in [self.text_button, self.visual_button, copy, edit, self.presentation]:
+        for widget in [
+            self.text_button,
+            self.visual_button,
+            copy,
+            copy_image,
+            export_png,
+            export_pdf,
+            edit,
+            self.presentation,
+        ]:
             header.addWidget(widget)
         layout.addLayout(header)
 
@@ -215,6 +243,61 @@ class SummaryDialog(QDialog):
             text = self.block.summary.content if self.block.summary else ""
         QApplication.clipboard().setText(text)
         show_toast(self, "Resumo copiado.", "success")
+
+    def _render_visual_image(self):
+        if not self.block.summary_visual.strip():
+            show_toast(self, "Este bloco ainda não possui resumo visual.", "warning")
+            return None
+        try:
+            return self.visual_export_service.render_image(self.block.summary_visual)
+        except (RuntimeError, ValueError, OSError) as exc:
+            show_toast(self, f"Não foi possível exportar o resumo: {exc}", "error")
+            return None
+
+    def _copy_visual_image(self) -> None:
+        image = self._render_visual_image()
+        if image is None:
+            return
+        QApplication.clipboard().setImage(image)
+        show_toast(self, "Resumo visual copiado como imagem.", "success")
+
+    def _export_png(self) -> None:
+        if not self.block.summary_visual.strip():
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Salvar resumo visual como PNG",
+            f"{self.block.slug}.png",
+            "PNG (*.png)",
+        )
+        if not path:
+            return
+        try:
+            self.visual_export_service.save_png(self.block.summary_visual, path)
+        except (RuntimeError, ValueError, OSError) as exc:
+            show_toast(self, f"Falha ao salvar PNG: {exc}", "error")
+            return
+        show_toast(self, "Resumo visual salvo como PNG.", "success")
+        log_action("summary_visual_exported", block_id=self.block.id, format="png", path=path)
+
+    def _export_pdf(self) -> None:
+        if not self.block.summary_visual.strip():
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Salvar resumo visual como PDF",
+            f"{self.block.slug}.pdf",
+            "PDF (*.pdf)",
+        )
+        if not path:
+            return
+        try:
+            self.visual_export_service.save_pdf(self.block.summary_visual, path)
+        except (RuntimeError, ValueError, OSError) as exc:
+            show_toast(self, f"Falha ao salvar PDF: {exc}", "error")
+            return
+        show_toast(self, "Resumo visual salvo como PDF.", "success")
+        log_action("summary_visual_exported", block_id=self.block.id, format="pdf", path=path)
 
     def _open_presentation(self) -> None:
         if not self.block.summary_visual:
@@ -254,6 +337,9 @@ class SummaryDialog(QDialog):
         self.visual_viewer = VisualSummaryWidget(self.block.summary_visual)
         self.stack.addWidget(self.visual_viewer)
         self.presentation.setEnabled(bool(self.block.summary_visual.strip()))
+        self.copy_image.setEnabled(bool(self.block.summary_visual.strip()))
+        self.export_png.setEnabled(bool(self.block.summary_visual.strip()))
+        self.export_pdf.setEnabled(bool(self.block.summary_visual.strip()))
         self.presentation.setToolTip("" if self.presentation.isEnabled() else "Disponível quando houver resumo visual.")
         preferred = self.block.preferred_summary_mode if self.block.summary_visual else "text"
         self._set_mode(preferred, save=False)
