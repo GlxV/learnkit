@@ -14,6 +14,7 @@ from app.application.dto.combined_review import (
     CombinedReviewSessionDTO,
     CombinedReviewSummaryDTO,
 )
+from app.application.dto.ai_provider import AIProviderDTO, ai_provider_options, get_ai_provider
 from app.application.dto.review_cycle import (
     ReviewBlockCycleDTO,
     ReviewCycleActivationDTO,
@@ -49,6 +50,9 @@ __all__ = [
     "CombinedReviewOriginDTO",
     "CombinedReviewSessionDTO",
     "CombinedReviewSummaryDTO",
+    "AIProviderDTO",
+    "ai_provider_options",
+    "get_ai_provider",
     "FlashcardQueueItemDTO",
     "FlashcardDTO",
     "ImportDestinationDTO",

@@ -65,6 +65,8 @@ Prompt generation is JSON-first by default. `PromptBuilder` asks for `learnkit.s
 
 `StudyPackageDTO` is the application contract for parsed packages. Progress query DTOs in `app/application/dto/progress.py` provide typed read models for queues and review dashboards while existing dict-returning methods remain for UI compatibility.
 
+The import wizard exposes an experimental `AIWorkspaceDialog` backed by an optional QtWebEngine view. It only opens the selected provider and keeps the generated prompt available for explicit copy; it does not inject credentials, submit prompts through provider-specific DOM automation, or store provider sessions. When QtWebEngine is unavailable, the dialog falls back to the system browser. Provider-specific submission and API integrations remain future work.
+
 ## Current Compatibility Boundaries
 
 - `BlockService` and `ProgressService` still exist for older callers and tests. `ProgressService` now keeps progress writes and delegates legacy read methods to `ProgressReader`.

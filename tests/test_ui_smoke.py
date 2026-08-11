@@ -359,3 +359,57 @@ def test_import_page_prepare_button_orchestrates_existing_steps(tmp_path, monkey
     page._finish_prepare_study_package()
 
     assert events == ["prompt", "copy", "open"]
+
+
+def test_import_page_exposes_experimental_ai_workspace(tmp_path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from PySide6.QtWidgets import QApplication, QPushButton
+
+    from app.core.database.sqlite_storage import SQLiteStorage
+    from app.ui.pages.import_page import ImportPage
+    from app.ui.theme import apply_app_theme
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_app_theme(app)
+    page = ImportPage([], SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False))
+
+    buttons = [button.text() for button in page.findChildren(QPushButton)]
+
+    assert "Workspace IA (experimental)" in buttons
+    assert page.ai_provider_combo.currentData() == "https://gemini.google.com/"
+
+
+def test_import_page_ai_workspace_uses_selected_provider(tmp_path, monkeypatch) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from PySide6.QtWidgets import QApplication
+
+    from app.core.database.sqlite_storage import SQLiteStorage
+    import app.ui.pages.import_page as import_page_module
+    from app.ui.pages.import_page import ImportPage
+    from app.ui.theme import apply_app_theme
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_app_theme(app)
+    page = ImportPage([], SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False))
+    page.prompt_preview.setPlainText("prompt pronto")
+    page.ai_provider_combo.setCurrentText("Claude")
+    captured: dict[str, object] = {}
+
+    class FakeWorkspace:
+        web_view = None
+
+        def __init__(self, provider, prompt, parent) -> None:
+            captured.update(provider=provider, prompt=prompt, parent=parent)
+
+        def show(self) -> None:
+            captured["shown"] = True
+
+    monkeypatch.setattr(import_page_module, "AIWorkspaceDialog", FakeWorkspace)
+    page._open_ai_workspace()
+
+    assert captured["provider"].key == "claude"
+    assert captured["prompt"] == "prompt pronto"
+    assert captured["parent"] is page
+    assert captured["shown"] is True

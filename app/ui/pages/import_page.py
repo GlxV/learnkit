@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 
 from app.application.dto.study_package import ImportDestinationDTO, StudyPackageDTO, StudyPackageImportDTO
 from app.application.dto.study_package_validation import StudyPackageValidationDTO
+from app.application.dto.ai_provider import ai_provider_options, get_ai_provider
 from app.application.dto.visual_preset import visual_preset_options
 from app.application.query_services.study_session_query_service import StudySessionQueryService
 from app.application.query_services.ui_data_provider import UISubject
@@ -50,14 +51,11 @@ from app.ui.feedback import (
     show_toast,
 )
 from app.ui.pages.base import panel, scroll_page
+from app.ui.pages.ai_workspace_dialog import AIWorkspaceDialog
 from app.ui.theme import COLORS
 
 
-AI_PROVIDERS = {
-    "Gemini": "https://gemini.google.com/",
-    "ChatGPT": "https://chatgpt.com/",
-    "Claude": "https://claude.ai/",
-}
+AI_PROVIDERS = {provider.label: provider.url for provider in ai_provider_options()}
 
 VISUAL_STYLE_OPTIONS = visual_preset_options()
 
@@ -584,9 +582,13 @@ class ImportPage(QWidget):
         provider_row = QHBoxLayout()
         provider_row.addWidget(label("IA externa", "Weak"))
         self.ai_provider_combo = QComboBox()
-        for name in AI_PROVIDERS:
-            self.ai_provider_combo.addItem(name, AI_PROVIDERS[name])
+        for provider in ai_provider_options():
+            # Keep the URL as item data for compatibility with the former map-based combo.
+            self.ai_provider_combo.addItem(provider.label, provider.url)
         provider_row.addWidget(self.ai_provider_combo)
+        workspace_button = QPushButton("Workspace IA (experimental)")
+        workspace_button.clicked.connect(self._open_ai_workspace)
+        provider_row.addWidget(workspace_button)
         provider_row.addStretch()
         layout.addLayout(provider_row)
 
@@ -1101,10 +1103,22 @@ class ImportPage(QWidget):
         self._update_context_card()
 
     def _open_external_ai(self) -> None:
-        url = str(self.ai_provider_combo.currentData() or AI_PROVIDERS["Gemini"])
+        provider = get_ai_provider(str(self.ai_provider_combo.currentData() or "gemini"))
+        url = provider.url
         webbrowser.open(url)
-        show_toast(self, "IA externa aberta no navegador.", "info")
-        log_action("external_ai_opened", url=url)
+        show_toast(self, f"{provider.label} aberto no navegador.", "info")
+        log_action("external_ai_opened", provider=provider.key, url=url)
+
+    def _open_ai_workspace(self) -> None:
+        prompt = self.prompt_preview.toPlainText().strip()
+        if not prompt:
+            show_toast(self, "Gere o prompt antes de abrir o workspace IA.", "warning")
+            self._show_wizard_step(2)
+            return
+        provider = get_ai_provider(str(self.ai_provider_combo.currentData() or "gemini"))
+        self.ai_workspace_dialog = AIWorkspaceDialog(provider, prompt, self)
+        self.ai_workspace_dialog.show()
+        log_action("ai_workspace_opened", provider=provider.key, embedded=self.ai_workspace_dialog.web_view is not None)
 
     def _paste_response_from_clipboard(self) -> None:
         text = QApplication.clipboard().text()
@@ -1353,9 +1367,10 @@ class ImportPage(QWidget):
         log_action("prompt_copied", chars=len(prompt))
 
     def _open_gemini(self) -> None:
-        webbrowser.open("https://gemini.google.com/")
-        show_toast(self, "Gemini aberto no navegador.", "info")
-        log_action("external_ai_opened", url="https://gemini.google.com/")
+        provider = get_ai_provider("gemini")
+        webbrowser.open(provider.url)
+        show_toast(self, f"{provider.label} aberto no navegador.", "info")
+        log_action("external_ai_opened", provider=provider.key, url=provider.url)
 
     def _validate_response(self) -> None:
         raw = self.ai_response.toPlainText().strip()
