@@ -11,7 +11,8 @@ class PromptOptions:
     question_count: int = 10
     difficulty: str = "medio"
     language_style: str = "direta para prova"
-    summary_mode: str = "texto e visual"
+    summary_mode: str = "texto + visual avancado"
+    visual_style: str = "auto"
     response_format: str = "json"
 
 
@@ -60,6 +61,7 @@ Contexto:
 - Dificuldade desejada: {selected.difficulty}
 - Linguagem: {selected.language_style}
 - Tipo de resumo: {selected.summary_mode}
+- Estilo visual do resumo: {selected.visual_style}
 
 Regras obrigatorias:
 - Use apenas o conteudo fornecido.
@@ -70,13 +72,21 @@ Regras obrigatorias:
 - Gere ate {selected.question_count} perguntas de multipla escolha com 4 alternativas.
 - O gabarito deve ser somente A, B, C ou D.
 - Crie um resumo texto objetivo, com visao geral e topicos principais.
-- Em summary_visual, gere um objeto JSON estruturado compativel com o LearnKit.
-- Para IAs fortes, use blocos variados no summary_visual: hero, section, cards, callout, table,
-  comparison, steps, timeline, tags, formula, definition, example, mistakes, flow e chart.
+- Em summary_visual, gere um objeto JSON estruturado compativel com o LearnKit e inclua "style": "{selected.visual_style}".
+- O resumo visual deve parecer uma apresentacao/mini-site de estudo premium, nao HTML simples.
+- Use blocos variados no summary_visual, evitando concentrar tudo em section: hero, cards, callout,
+  table, comparison, steps, timeline, mistakes, formula, flow ou chart quando fizer sentido.
+- Tambem pode usar mindmap, concept_map, exam_trap, source_quote e quiz_preview quando o conteudo pedir.
+- Variantes aceitas de callout: info, warning, danger, success, tip e exam.
 - Charts devem ser apenas dados declarativos em JSON. Nunca envie codigo Python, HTML ou JS.
+- Nao envie HTML bruto, CSS, scripts, iframes ou Markdown dentro de summary_visual.
+- Evite texto gigante em um unico bloco; divida em blocos curtos, escaneaveis e memoraveis.
 - Para items, use campos semanticos quando fizer sentido: term/definition, mistake/correction,
   step/title/text, name/formula, label/text. O LearnKit renderiza esses formatos diretamente.
 - Se nao conseguir gerar resumo visual, use um objeto vazio em summary_visual.
+- Direcao dos estilos: auto escolhe pelo conteudo; prova e limpo e focado em memorizacao;
+  lab usa clima cientifico; neon usa azul/roxo/ciano premium; retro usa terminal/CRT sutil;
+  minimalista e serio, claro e discreto.
 
 Formato JSON esperado:
 
@@ -86,6 +96,7 @@ Formato JSON esperado:
   "summary_visual": {{
     "title": "{block_title}",
     "subtitle": "Resumo visual para revisao",
+    "style": "{selected.visual_style}",
     "sections": [
       {{
         "type": "hero",
@@ -101,7 +112,7 @@ Formato JSON esperado:
       }},
       {{
         "type": "callout",
-        "variant": "tip",
+        "variant": "exam",
         "title": "Atalho mental",
         "text": "..."
       }},
@@ -143,7 +154,20 @@ Formato JSON esperado:
         "labels": ["Conceito A", "Conceito B"],
         "values": [80, 60],
         "unit": "relevancia",
-        "description": "Grafico didatico para revisao."
+        "description": "Grafico didatico para revisao.",
+        "interpretation": "Leia o conceito A como prioridade maior na revisao."
+      }},
+      {{
+        "type": "exam_trap",
+        "title": "Pegadinha de prova",
+        "text": "..."
+      }},
+      {{
+        "type": "quiz_preview",
+        "title": "Como pode cair",
+        "items": [
+          {{"title": "Pergunta provavel", "text": "Resposta esperada em uma frase."}}
+        ]
       }}
     ]
   }},
@@ -184,6 +208,7 @@ Contexto:
 - Dificuldade desejada: {selected.difficulty}
 - Linguagem: {selected.language_style}
 - Tipo de resumo: {selected.summary_mode}
+- Estilo visual do resumo: {selected.visual_style}
 
 Regras obrigatorias:
 - Use apenas o conteudo fornecido.
@@ -197,14 +222,22 @@ Regras obrigatorias:
 - Gere ate {selected.question_count} perguntas de multipla escolha com 4 alternativas. Se o conteudo for pequeno, gere menos, mas mantenha o formato.
 - O gabarito deve ser somente A, B, C ou D.
 - Crie um resumo texto objetivo, com visao geral e topicos principais.
-- Em # RESUMO_VISUAL, gere JSON estruturado compativel com o LearnKit.
-- Para IAs fortes, use blocos variados: hero, section, cards, callout, table, comparison, steps,
-  timeline, tags, formula, definition, example, mistakes, flow e chart.
+- Em # RESUMO_VISUAL, gere JSON estruturado compativel com o LearnKit e inclua "style": "{selected.visual_style}".
+- O resumo visual deve parecer uma apresentacao/mini-site de estudo premium, nao HTML simples.
+- Use blocos variados: hero, cards, callout, table, comparison, steps, timeline, mistakes,
+  formula, flow e chart quando fizer sentido. Evite usar somente section.
+- Tambem pode usar mindmap, concept_map, exam_trap, source_quote e quiz_preview.
+- Variantes aceitas de callout: info, warning, danger, success, tip e exam.
 - Charts devem ser apenas dados declarativos em JSON. Nunca envie codigo Python, HTML ou JS.
+- Nao envie HTML bruto, CSS, scripts, iframes ou Markdown dentro de # RESUMO_VISUAL.
+- Evite texto gigante em um unico bloco; divida em blocos curtos, escaneaveis e memoraveis.
 - Para items, prefira campos semanticos: term/definition, mistake/correction, step/title/text,
   name/formula, label/text. Nao use "Item" quando houver conteudo especifico.
 - Nao coloque Markdown, comentarios ou cercas ``` dentro de # RESUMO_VISUAL.
 - Se nao conseguir gerar resumo visual, deixe # RESUMO_VISUAL vazio e preserve as outras secoes.
+- Direcao dos estilos: auto escolhe pelo conteudo; prova e limpo e focado em memorizacao;
+  lab usa clima cientifico; neon usa azul/roxo/ciano premium; retro usa terminal/CRT sutil;
+  minimalista e serio, claro e discreto.
 
 Formato exato esperado:
 
@@ -224,6 +257,7 @@ Formato exato esperado:
 {{
   "title": "{block_title}",
   "subtitle": "Resumo visual para revisao",
+  "style": "{selected.visual_style}",
   "sections": [
     {{
       "type": "hero",
@@ -274,7 +308,20 @@ Formato exato esperado:
       "labels": ["A", "B", "C"],
       "values": [90, 70, 50],
       "unit": "pontuacao",
-      "description": "Use somente dados declarativos."
+      "description": "Use somente dados declarativos.",
+      "interpretation": "Explique em uma frase como revisar este grafico."
+    }},
+    {{
+      "type": "exam_trap",
+      "title": "Pegadinha de prova",
+      "text": "..."
+    }},
+    {{
+      "type": "quiz_preview",
+      "title": "Como pode cair",
+      "items": [
+        {{"title": "Pergunta provavel", "text": "Resposta esperada em uma frase."}}
+      ]
     }}
   ]
 }}

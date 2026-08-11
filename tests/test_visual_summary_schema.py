@@ -43,6 +43,42 @@ def test_parse_visual_summary_keeps_unknown_type_as_generic_section() -> None:
     assert summary["sections"][0]["text"] == "Texto"
 
 
+def test_parse_visual_summary_accepts_style_and_new_visual_types() -> None:
+    summary = parse_visual_summary(
+        {
+            "title": "Micologia",
+            "style": "lab",
+            "sections": [
+                {
+                    "type": "mindmap",
+                    "title": "Mapa",
+                    "nodes": [
+                        {"label": "Hifas", "description": "Filamentos"},
+                        {"label": "Micelio", "description": "Rede"},
+                    ],
+                },
+                {"type": "concept_map", "items": [{"title": "Esporos", "text": "Dispersao"}]},
+                {"type": "exam_trap", "trap": "Confundir levedura e fungo filamentoso.", "fix": "Compare morfologia."},
+                {"type": "source_quote", "quote": "Trecho importante", "source": "Apostila"},
+                {"type": "quiz_preview", "questions": [{"question": "Como cai?", "answer": "Comparando conceitos."}]},
+            ],
+        }
+    )
+
+    assert summary is not None
+    assert summary["style"] == "lab"
+    assert [section["type"] for section in summary["sections"]] == [
+        "mindmap",
+        "concept_map",
+        "exam_trap",
+        "source_quote",
+        "quiz_preview",
+    ]
+    assert summary["sections"][0]["items"][0]["title"] == "Hifas"
+    assert summary["sections"][2]["text"] == "Confundir levedura e fungo filamentoso.\nCompare morfologia."
+    assert summary["sections"][4]["items"][0]["title"] == "Como cai?"
+
+
 def test_parse_visual_summary_accepts_incomplete_chart_without_breaking() -> None:
     summary = parse_visual_summary(
         {"title": "Teste", "sections": [{"type": "chart", "title": "Sem dados"}]}

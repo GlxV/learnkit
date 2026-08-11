@@ -179,3 +179,119 @@ def test_visual_summary_widget_renders_non_standard_item_fields() -> None:
     assert "Cabeca" in texts
     assert "No: dado + proximo" in texts
     assert "Item" not in texts
+
+
+def test_visual_summary_widget_renders_new_premium_block_types() -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from PySide6.QtWidgets import QApplication, QLabel
+
+    from app.ui.components.summary_visual import VisualSummaryWidget
+    from app.ui.theme import apply_app_theme
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_app_theme(app)
+    raw = """
+    {
+      "title": "Micologia",
+      "style": "lab",
+      "sections": [
+        {"type": "mindmap", "title": "Mapa mental", "items": [{"title": "Hifas", "text": "Filamentos"}]},
+        {"type": "concept_map", "title": "Mapa de conceitos", "items": [{"title": "Micelio", "text": "Rede"}]},
+        {"type": "exam_trap", "title": "Pegadinha", "text": "Levedura nao e sempre filamentosa."},
+        {"type": "source_quote", "quote": "Fungos absorvem nutrientes.", "source": "Apostila"},
+        {"type": "quiz_preview", "items": [{"title": "Como cai?", "text": "Comparar grupos."}]}
+      ]
+    }
+    """
+
+    widget = VisualSummaryWidget(raw)
+    texts = [child.text() for child in widget.findChildren(QLabel)]
+
+    assert "Mapa mental" in texts
+    assert "Hifas" in texts
+    assert "Pegadinha" in texts
+    assert '"Fungos absorvem nutrientes."' in texts
+    assert "Como cai?" in texts
+
+
+def test_import_page_guided_flow_defaults_and_modes(tmp_path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from PySide6.QtWidgets import QApplication
+
+    from app.core.database.sqlite_storage import SQLiteStorage
+    from app.ui.pages.import_page import ImportPage
+    from app.ui.theme import apply_app_theme
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_app_theme(app)
+    storage = SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False)
+    subject = storage.create_subject("Biologia")
+    module = storage.create_module(subject.slug, "Micologia")
+    storage.create_block(subject.slug, module.slug, "Fungos")
+
+    page = ImportPage([], storage)
+    page.subject_combo.setCurrentText("Biologia")
+    page.module_combo.setCurrentText("Micologia")
+    page.refresh()
+
+    assert page.wizard_stack.currentIndex() == 0
+    assert page.create_action_button.isChecked()
+    assert not page.update_action_button.isChecked()
+    assert page.options_panel.isHidden()
+    assert page.advanced_import_panel.isHidden()
+    assert page.flashcard_count.value() == 10
+    assert page.question_count.value() == 10
+    assert page.language_combo.currentText() == "direta para prova"
+    assert page.summary_mode_combo.currentText() == "texto + visual avancado"
+    assert page.visual_style_combo.currentData() == "auto"
+
+    page.update_action_button.click()
+
+    assert page._is_update_mode() is True
+    assert page.existing_block_combo.currentData() is not None
+    assert page.block_title.isEnabled() is False
+
+
+def test_import_page_validation_card_updates_from_json_response(tmp_path, monkeypatch) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from PySide6.QtWidgets import QApplication, QLabel
+
+    from app.core.database.sqlite_storage import SQLiteStorage
+    import app.ui.pages.import_page as import_page_module
+    from app.ui.pages.import_page import ImportPage
+    from app.ui.theme import apply_app_theme
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_app_theme(app)
+    monkeypatch.setattr(import_page_module, "show_toast", lambda *args, **kwargs: None)
+    storage = SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False)
+    page = ImportPage([], storage)
+    page.ai_response.setPlainText(
+        """
+        {
+          "schema_version": "learnkit.study_package.v1",
+          "summary_text": "Resumo curto.",
+          "summary_visual": {"title": "Teste", "style": "neon", "sections": [{"type": "hero", "title": "Centro"}]},
+          "flashcards": [{"front": "Pergunta?", "back": "Resposta."}],
+          "questions": [
+            {
+              "statement": "Enunciado?",
+              "alternatives": {"A": "A", "B": "B", "C": "C", "D": "D"},
+              "correct_answer": "A"
+            }
+          ]
+        }
+        """
+    )
+
+    page._validate_response()
+    metric_values = [label.text() for label in page.validation_card.findChildren(QLabel)]
+
+    assert page.parsed_response is not None
+    assert page.save_button.isEnabled()
+    assert "sim" in metric_values
+    assert "1" in metric_values
+    assert "Pacote validado" in page.response_status.text()

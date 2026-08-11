@@ -20,6 +20,11 @@ SUPPORTED_VISUAL_BLOCK_TYPES = {
     "mistakes",
     "flow",
     "chart",
+    "mindmap",
+    "concept_map",
+    "exam_trap",
+    "source_quote",
+    "quiz_preview",
 }
 
 LEGACY_TYPE_MAP = {
@@ -29,7 +34,7 @@ LEGACY_TYPE_MAP = {
     "quote": "callout",
 }
 
-ITEM_TITLE_KEYS = ("title", "term", "mistake", "name", "label")
+ITEM_TITLE_KEYS = ("title", "question", "term", "mistake", "name", "label")
 ITEM_BODY_KEYS = (
     "text",
     "definition",
@@ -40,6 +45,10 @@ ITEM_BODY_KEYS = (
     "answer",
     "explanation",
     "value",
+    "quote",
+    "source",
+    "trap",
+    "fix",
 )
 STRUCTURAL_KEYS = {
     "type",
@@ -57,6 +66,12 @@ STRUCTURAL_KEYS = {
     "values",
     "chart_type",
     "unit",
+    "style",
+    "theme",
+    "interpretation",
+    "insight",
+    "pros",
+    "cons",
 }
 
 
@@ -116,6 +131,7 @@ def normalize_visual_summary(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "title": title,
         "subtitle": subtitle,
+        "style": _visual_style(data.get("style") or data.get("theme")),
         "sections": normalized_sections,
     }
 
@@ -154,6 +170,12 @@ def normalize_visual_block(block: dict[str, Any]) -> dict[str, Any]:
         normalized["chart_type"] = _chart_type(block.get("chart_type"))
         normalized["labels"] = _string_items(block.get("labels"))
         normalized["values"] = _numbers(block.get("values"))
+    elif block_type in {"mindmap", "concept_map"}:
+        normalized["items"] = _concept_items(block)
+    elif block_type in {"exam_trap", "source_quote"}:
+        normalized["items"] = _items(block.get("items"))
+    elif block_type == "quiz_preview":
+        normalized["items"] = _items(block.get("items") or block.get("questions"))
     return normalized
 
 
@@ -251,6 +273,12 @@ def _visual_item(value: object, index: int = 1) -> dict[str, Any]:
     points = _string_items(value.get("items"))
     if points:
         item["points"] = points
+    pros = _string_items(value.get("pros"))
+    if pros:
+        item["pros"] = pros
+    cons = _string_items(value.get("cons"))
+    if cons:
+        item["cons"] = cons
     return item
 
 
@@ -282,9 +310,26 @@ def _comparison_items(block: dict[str, Any]) -> list[dict[str, Any]]:
                     "text": text,
                     "number": str(len(sides) + 1),
                     "points": points,
+                    "pros": _string_items(side.get("pros")),
+                    "cons": _string_items(side.get("cons")),
                 }
             )
     return sides or items
+
+
+def _concept_items(block: dict[str, Any]) -> list[dict[str, Any]]:
+    items = _items(block.get("items"))
+    if items:
+        return items
+    nodes = block.get("nodes")
+    if not isinstance(nodes, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for index, node in enumerate(nodes, start=1):
+        item = _visual_item(node, index)
+        if item["title"] or item["text"]:
+            normalized.append(item)
+    return normalized
 
 
 def _flow_items(block: dict[str, Any]) -> list[str]:
@@ -413,9 +458,14 @@ def _callout_variant(block: dict[str, Any], raw_type: str) -> str:
     variant = _text(block.get("variant"), raw_type).lower()
     if variant == "quote":
         return "info"
-    if variant in {"info", "success", "warning", "danger", "tip", "example", "formula"}:
+    if variant in {"info", "success", "warning", "danger", "tip", "example", "formula", "exam"}:
         return variant
     return "info"
+
+
+def _visual_style(value: object) -> str:
+    style = _text(value, "auto").lower()
+    return style if style in {"auto", "prova", "lab", "neon", "retro", "minimalista"} else "auto"
 
 
 def _default_title(block_type: str) -> str:
@@ -435,4 +485,9 @@ def _default_title(block_type: str) -> str:
         "mistakes": "Erros comuns",
         "flow": "Fluxo",
         "chart": "Grafico",
+        "mindmap": "Mapa mental",
+        "concept_map": "Mapa de conceitos",
+        "exam_trap": "Pegadinha de prova",
+        "source_quote": "Trecho fonte",
+        "quiz_preview": "Como pode cair",
     }.get(block_type, "Secao")

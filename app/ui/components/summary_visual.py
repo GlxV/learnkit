@@ -5,7 +5,7 @@ import math
 from typing import Any
 
 from PySide6.QtCore import QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QKeyEvent, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -29,17 +29,110 @@ from app.ui.components.cards import EmptyState, label
 from app.ui.theme import COLORS
 
 
-def _panel(elevated: bool = False, accent: str | None = None) -> QFrame:
+VISUAL_PALETTES: dict[str, dict[str, str]] = {
+    "auto": {
+        "background": "#050B14",
+        "card": "#091426",
+        "card_alt": "#101B34",
+        "card_soft": "#14213D",
+        "border": "#263A60",
+        "accent": "#60A5FA",
+        "accent_2": "#8B5CF6",
+        "accent_3": "#22D3EE",
+        "warning": "#F59E0B",
+        "danger": "#F87171",
+        "success": "#34D399",
+    },
+    "prova": {
+        "background": "#07111F",
+        "card": "#0D1728",
+        "card_alt": "#142033",
+        "card_soft": "#18263A",
+        "border": "#2B3B55",
+        "accent": "#38BDF8",
+        "accent_2": "#818CF8",
+        "accent_3": "#FBBF24",
+        "warning": "#F59E0B",
+        "danger": "#FB7185",
+        "success": "#22C55E",
+    },
+    "lab": {
+        "background": "#03130F",
+        "card": "#071D17",
+        "card_alt": "#0D2A21",
+        "card_soft": "#12382C",
+        "border": "#1F4D3D",
+        "accent": "#2DD4BF",
+        "accent_2": "#22C55E",
+        "accent_3": "#A3E635",
+        "warning": "#EAB308",
+        "danger": "#F87171",
+        "success": "#4ADE80",
+    },
+    "neon": {
+        "background": "#050716",
+        "card": "#0A1028",
+        "card_alt": "#111A3D",
+        "card_soft": "#172554",
+        "border": "#334155",
+        "accent": "#22D3EE",
+        "accent_2": "#A78BFA",
+        "accent_3": "#3B82F6",
+        "warning": "#FACC15",
+        "danger": "#FB7185",
+        "success": "#34D399",
+    },
+    "retro": {
+        "background": "#080D0A",
+        "card": "#0D1511",
+        "card_alt": "#132019",
+        "card_soft": "#18291F",
+        "border": "#33543F",
+        "accent": "#86EFAC",
+        "accent_2": "#FBBF24",
+        "accent_3": "#5EEAD4",
+        "warning": "#F59E0B",
+        "danger": "#F87171",
+        "success": "#22C55E",
+    },
+    "minimalista": {
+        "background": "#0A0F18",
+        "card": "#111827",
+        "card_alt": "#172033",
+        "card_soft": "#1F2937",
+        "border": "#334155",
+        "accent": "#CBD5E1",
+        "accent_2": "#60A5FA",
+        "accent_3": "#94A3B8",
+        "warning": "#FBBF24",
+        "danger": "#F87171",
+        "success": "#34D399",
+    },
+}
+
+
+def _visual_palette(style: object | None = None) -> dict[str, str]:
+    key = str(style or "auto").strip().lower()
+    palette = VISUAL_PALETTES.get(key, VISUAL_PALETTES["auto"])
+    return {**VISUAL_PALETTES["auto"], **palette}
+
+
+def _panel(
+    elevated: bool = False,
+    accent: str | None = None,
+    background: str | None = None,
+    radius: int = 16,
+) -> QFrame:
     panel = QFrame()
     panel.setObjectName("VisualPanel")
     border = accent or COLORS["border"]
-    background = COLORS["card_alt"] if elevated else COLORS["card"]
+    selected_background = background or (COLORS["card_alt"] if elevated else COLORS["card"])
     panel.setStyleSheet(
         f"""
         QFrame#VisualPanel {{
-            background: {background};
+            background: {selected_background};
             border: 1px solid {border};
-            border-radius: 14px;
+            border-radius: {radius}px;
         }}
         """
     )
@@ -63,11 +156,27 @@ def _title(text: str, kind: str = "SectionTitle", size: int | None = None) -> QL
     return widget
 
 
+def _chip(text: str, color: str, background: str | None = None) -> QLabel:
+    chip = QLabel(text)
+    chip.setWordWrap(True)
+    chip.setStyleSheet(
+        f"background: {background or COLORS['accent_dark']}; border: 1px solid {color}; "
+        f"border-radius: 10px; padding: 5px 9px; color: {color}; font-weight: 800;"
+    )
+    return chip
+
+
 class ChartWidget(QWidget):
-    def __init__(self, block: dict[str, Any], presentation: bool = False) -> None:
+    def __init__(
+        self,
+        block: dict[str, Any],
+        presentation: bool = False,
+        palette: dict[str, str] | None = None,
+    ) -> None:
         super().__init__()
         self.block = block
         self.presentation = presentation
+        self.palette = palette or _visual_palette()
         self.setMinimumHeight(340 if presentation else 230)
         self.setSizePolicy(self.sizePolicy().horizontalPolicy(), self.sizePolicy().verticalPolicy())
 
@@ -78,7 +187,7 @@ class ChartWidget(QWidget):
         super().paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.fillRect(self.rect(), QColor(COLORS["card"]))
+        painter.fillRect(self.rect(), QColor(self.palette["card"]))
         labels = [str(item) for item in self.block.get("labels", [])]
         values = [float(item) for item in self.block.get("values", [])]
         chart_type = str(self.block.get("chart_type") or "bar")
@@ -104,8 +213,14 @@ class ChartWidget(QWidget):
         count = len(values)
         gap = 14
         bar_width = max(16, int((rect.width() - gap * (count - 1)) / max(count, 1)))
-        accent = QColor(COLORS["accent"])
+        accent = QColor(self.palette["accent"])
         muted = QColor(COLORS["muted"])
+        grid_pen = QPen(QColor(self.palette["border"]))
+        grid_pen.setWidth(1)
+        painter.setPen(grid_pen)
+        for step in range(1, 4):
+            y = rect.top() + rect.height() * step / 4
+            painter.drawLine(int(rect.left()), int(y), int(rect.right()), int(y))
         painter.setPen(Qt.PenStyle.NoPen)
         for index, value in enumerate(values):
             ratio = max(0.0, min(1.0, value / maximum))
@@ -113,7 +228,7 @@ class ChartWidget(QWidget):
             x = rect.left() + index * (bar_width + gap)
             y = rect.bottom() - height
             bar = QRectF(x, y, bar_width, height)
-            painter.setBrush(accent if index % 2 == 0 else QColor(COLORS["accent_active"]))
+            painter.setBrush(accent if index % 2 == 0 else QColor(self.palette["accent_2"]))
             painter.drawRoundedRect(bar, 7, 7)
             painter.setPen(muted)
             painter.drawText(QRectF(x - 8, rect.bottom() + 6, bar_width + 16, 24), Qt.AlignmentFlag.AlignCenter, self._label(labels, index))
@@ -132,10 +247,10 @@ class ChartWidget(QWidget):
             painter.setPen(QColor(COLORS["muted"]))
             painter.drawText(QRectF(rect.left(), y, label_width - 10, row_height), Qt.AlignmentFlag.AlignVCenter, self._label(labels, index))
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(COLORS["card_alt"]))
+            painter.setBrush(QColor(self.palette["card_soft"]))
             painter.drawRoundedRect(bar_rect, 7, 7)
             fill = QRectF(bar_rect.left(), bar_rect.top(), bar_rect.width() * max(0, value / maximum), bar_rect.height())
-            painter.setBrush(QColor(COLORS["accent"]))
+            painter.setBrush(QColor(self.palette["accent"]))
             painter.drawRoundedRect(fill, 7, 7)
             painter.setPen(QColor(COLORS["text"]))
             painter.drawText(QRectF(bar_rect.right() + 12, y, 58, row_height), Qt.AlignmentFlag.AlignVCenter, self._format_value(value))
@@ -147,7 +262,13 @@ class ChartWidget(QWidget):
         ring = QRectF(rect.left(), rect.top(), size, size)
         total = sum(max(0, value) for value in values) or 1
         start = 90 * 16
-        colors = [QColor(COLORS["accent"]), QColor(COLORS["accent_active"]), QColor(COLORS["warning"]), QColor(COLORS["success"])]
+        colors = [
+            QColor(self.palette["accent"]),
+            QColor(self.palette["accent_2"]),
+            QColor(self.palette["accent_3"]),
+            QColor(self.palette["success"]),
+            QColor(self.palette["warning"]),
+        ]
         pen = QPen()
         pen.setWidth(24 if self.presentation else 18)
         painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -178,9 +299,9 @@ class ChartWidget(QWidget):
             painter.drawText(QRectF(rect.left(), y, rect.width(), 18), Qt.AlignmentFlag.AlignLeft, self._label(labels, index))
             bar = QRectF(rect.left(), y + 24, rect.width() - 64, 12)
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(COLORS["card_alt"]))
+            painter.setBrush(QColor(self.palette["card_soft"]))
             painter.drawRoundedRect(bar, 6, 6)
-            painter.setBrush(QColor(COLORS["accent"]))
+            painter.setBrush(QColor(self.palette["accent"]))
             painter.drawRoundedRect(QRectF(bar.left(), bar.top(), bar.width() * progress, bar.height()), 6, 6)
             painter.setPen(QColor(COLORS["text"]))
             painter.drawText(QRectF(bar.right() + 12, y + 17, 52, 22), Qt.AlignmentFlag.AlignVCenter, f"{int(value)}%")
@@ -197,10 +318,11 @@ class ChartWidget(QWidget):
 
 
 class SummaryVisualRenderer:
-    def __init__(self, presentation: bool = False) -> None:
+    def __init__(self, presentation: bool = False, style: object | None = None) -> None:
         self.presentation = presentation
-        self.title_size = 34 if presentation else 26
-        self.section_title_size = 25 if presentation else 17
+        self.palette = _visual_palette(style)
+        self.title_size = 42 if presentation else 30
+        self.section_title_size = 28 if presentation else 18
         self.body_size = 18 if presentation else 14
 
     def render_summary(self, layout: QVBoxLayout, data: dict[str, Any]) -> None:
@@ -222,7 +344,12 @@ class SummaryVisualRenderer:
             if isinstance(section, dict):
                 layout.addWidget(self.render_block(section))
 
-    def render_block(self, block: dict[str, Any], root_title: object | None = None, root_subtitle: object | None = None) -> QWidget:
+    def render_block(
+        self,
+        block: dict[str, Any],
+        root_title: object | None = None,
+        root_subtitle: object | None = None,
+    ) -> QWidget:
         block_type = str(block.get("type") or "section")
         if block_type == "hero":
             return self._hero(block, root_title=root_title, root_subtitle=root_subtitle)
@@ -244,30 +371,75 @@ class SummaryVisualRenderer:
             return self._flow(block)
         if block_type == "chart":
             return self._chart(block)
+        if block_type in {"mindmap", "concept_map"}:
+            return self._concept_map(block, block_type)
+        if block_type == "exam_trap":
+            return self._exam_trap(block)
+        if block_type == "source_quote":
+            return self._source_quote(block)
+        if block_type == "quiz_preview":
+            return self._quiz_preview(block)
         return self._section(block)
 
-    def _hero(self, block: dict[str, Any], root_title: object | None = None, root_subtitle: object | None = None) -> QWidget:
-        panel = _panel(elevated=True, accent=COLORS["border_hover"])
+    def _panel(self, elevated: bool = False, accent: str | None = None, tone: str = "default") -> QFrame:
+        background = self.palette["card_alt"] if elevated else self.palette["card"]
+        if tone == "soft":
+            background = self.palette["card_soft"]
+        return _panel(
+            elevated=elevated,
+            accent=accent or self.palette["border"],
+            background=background,
+            radius=18 if self.presentation else 16,
+        )
+
+    def _hero(
+        self,
+        block: dict[str, Any],
+        root_title: object | None = None,
+        root_subtitle: object | None = None,
+    ) -> QWidget:
+        panel = QFrame()
+        panel.setObjectName("VisualHeroPanel")
+        panel.setMinimumHeight(280 if self.presentation else 190)
+        panel.setStyleSheet(
+            f"""
+            QFrame#VisualHeroPanel {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 {self.palette['card_alt']},
+                    stop:0.55 {self.palette['card']},
+                    stop:1 {self.palette['card_soft']});
+                border: 1px solid {self.palette['accent_2']};
+                border-radius: {22 if self.presentation else 18}px;
+            }}
+            """
+        )
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(30 if self.presentation else 24, 26 if self.presentation else 20, 30 if self.presentation else 24, 26 if self.presentation else 20)
-        layout.setSpacing(12)
-        eyebrow = str(root_subtitle or block.get("subtitle") or "").strip()
+        margins = 38 if self.presentation else 26
+        layout.setContentsMargins(margins, margins, margins, margins)
+        layout.setSpacing(14)
+        eyebrow = str(root_subtitle or block.get("eyebrow") or block.get("subtitle") or "").strip()
         if eyebrow:
-            tag = QLabel(eyebrow)
-            tag.setStyleSheet(
-                f"background: {COLORS['accent_dark']}; border: 1px solid {COLORS['border_hover']}; "
-                f"border-radius: 12px; padding: 6px 10px; color: {COLORS['text']}; font-weight: 700;"
-            )
-            tag.setMaximumWidth(520)
-            layout.addWidget(tag)
-        layout.addWidget(_title(str(block.get("title") or root_title or "Resumo visual"), "HeroTitle", self.title_size))
+            layout.addWidget(_chip(eyebrow, self.palette["accent_3"], self.palette["card_soft"]))
+        title = _title(str(block.get("title") or root_title or "Resumo visual"), "HeroTitle", self.title_size)
+        title.setStyleSheet(
+            f"font-size: {self.title_size}px; font-weight: 900; color: {COLORS['text']};"
+        )
+        layout.addWidget(title)
         text = str(block.get("text") or block.get("content") or "")
         if text:
-            layout.addWidget(_body(text, self.body_size))
+            layout.addWidget(_body(text, self.body_size + (1 if self.presentation else 0), COLORS["text"]))
+        highlights = block.get("items") if isinstance(block.get("items"), list) else []
+        if highlights:
+            row = QHBoxLayout()
+            row.setSpacing(8)
+            for item in highlights[:4]:
+                row.addWidget(_chip(str(item), self.palette["accent"]))
+            row.addStretch()
+            layout.addLayout(row)
         return panel
 
     def _section(self, block: dict[str, Any]) -> QWidget:
-        panel = _panel()
+        panel = self._panel()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(10)
@@ -278,11 +450,14 @@ class SummaryVisualRenderer:
         return panel
 
     def _cards(self, block: dict[str, Any]) -> QWidget:
-        panel = _panel()
+        panel = self._panel()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(14)
         layout.addWidget(_title(str(block.get("title") or "Cards"), "SectionTitle", self.section_title_size))
+        text = str(block.get("text") or "")
+        if text:
+            layout.addWidget(_body(text, self.body_size))
         items = block.get("items") if isinstance(block.get("items"), list) else []
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
@@ -291,11 +466,25 @@ class SummaryVisualRenderer:
         for index, item in enumerate(items):
             if not isinstance(item, dict):
                 continue
-            card = _panel(elevated=True)
+            accent = [self.palette["accent"], self.palette["accent_2"], self.palette["accent_3"]][index % 3]
+            card = self._panel(elevated=True, accent=accent)
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(16, 14, 16, 14)
             card_layout.setSpacing(8)
-            card_layout.addWidget(_title(str(item.get("title") or f"Item {index + 1}"), "SmallTitle"))
+            header = QHBoxLayout()
+            icon = str(item.get("icon") or item.get("emoji") or "").strip()
+            if icon:
+                icon_label = QLabel(icon[:3])
+                icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                icon_label.setFixedSize(34, 34)
+                icon_label.setStyleSheet(
+                    f"background: {self.palette['card_soft']}; border: 1px solid {accent}; "
+                    f"border-radius: 10px; color: {COLORS['text']}; font-size: 17px;"
+                )
+                header.addWidget(icon_label)
+            header.addWidget(_title(str(item.get("title") or f"Item {index + 1}"), "SmallTitle"))
+            header.addStretch()
+            card_layout.addLayout(header)
             if item.get("text"):
                 card_layout.addWidget(_body(str(item.get("text")), self.body_size))
             self._add_points(card_layout, item)
@@ -304,29 +493,34 @@ class SummaryVisualRenderer:
         return panel
 
     def _callout(self, block: dict[str, Any]) -> QWidget:
-        variant = str(block.get("variant") or "info")
+        variant = str(block.get("variant") or "info").lower()
         color = {
-            "info": COLORS["accent"],
-            "success": COLORS["success"],
-            "warning": COLORS["warning"],
-            "danger": COLORS["error"],
-            "tip": COLORS["accent_hover"],
-            "example": COLORS["success"],
-            "formula": COLORS["accent"],
-        }.get(variant, COLORS["accent"])
-        panel = _panel(elevated=True, accent=color)
+            "info": self.palette["accent"],
+            "success": self.palette["success"],
+            "warning": self.palette["warning"],
+            "danger": self.palette["danger"],
+            "tip": self.palette["accent_3"],
+            "exam": self.palette["accent_2"],
+            "example": self.palette["success"],
+            "formula": self.palette["accent"],
+        }.get(variant, self.palette["accent"])
+        panel = self._panel(elevated=True, accent=color, tone="soft")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 18, 22, 18)
-        layout.setSpacing(8)
-        layout.addWidget(_title(str(block.get("title") or "Destaque"), "SectionTitle", self.section_title_size))
+        layout.setSpacing(9)
+        header = QHBoxLayout()
+        header.addWidget(_chip(variant.upper(), color, self.palette["card"]))
+        header.addWidget(_title(str(block.get("title") or "Destaque"), "SectionTitle", self.section_title_size))
+        header.addStretch()
+        layout.addLayout(header)
         text = str(block.get("text") or "")
         if text:
-            layout.addWidget(_body(text, self.body_size))
+            layout.addWidget(_body(text, self.body_size, COLORS["text"]))
         self._add_item_list(layout, block)
         return panel
 
     def _table(self, block: dict[str, Any]) -> QWidget:
-        panel = _panel()
+        panel = self._panel()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(12)
@@ -337,20 +531,50 @@ class SummaryVisualRenderer:
         table = QTableWidget(len(rows), column_count)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(False)
+        table.setWordWrap(True)
         table.verticalHeader().hide()
         table.setHorizontalHeaderLabels([str(headers[index]) if index < len(headers) else "" for index in range(column_count)])
         for row_index, row in enumerate(rows):
             values = row if isinstance(row, list) else []
+            table.setRowHeight(row_index, 46 if self.presentation else 38)
             for column_index, value in enumerate(values[:column_count]):
-                table.setItem(row_index, column_index, QTableWidgetItem(str(value)))
+                item = QTableWidgetItem(str(value))
+                item.setForeground(QColor(COLORS["text"]))
+                table.setItem(row_index, column_index, item)
         table.horizontalHeader().setStretchLastSection(True)
+        table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         table.resizeRowsToContents()
-        table.setMinimumHeight(min(420 if self.presentation else 320, 78 + max(1, len(rows)) * 42))
+        table.setMinimumHeight(min(460 if self.presentation else 340, 94 + max(1, len(rows)) * 48))
+        table.setStyleSheet(
+            f"""
+            QTableWidget {{
+                background: {self.palette['card_alt']};
+                border: 1px solid {self.palette['border']};
+                border-radius: 14px;
+                alternate-background-color: {self.palette['card_soft']};
+                gridline-color: transparent;
+            }}
+            QTableWidget::item {{
+                padding: 10px;
+                border-bottom: 1px solid {self.palette['border']};
+            }}
+            QHeaderView::section {{
+                background: {self.palette['card_soft']};
+                color: {self.palette['accent_3']};
+                font-weight: 800;
+                padding: 11px;
+                border: 0;
+                border-bottom: 1px solid {self.palette['accent']};
+            }}
+            """
+        )
         layout.addWidget(table)
         return panel
 
     def _comparison(self, block: dict[str, Any]) -> QWidget:
-        panel = _panel()
+        panel = self._panel()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(14)
@@ -358,41 +582,55 @@ class SummaryVisualRenderer:
         items = block.get("items") if isinstance(block.get("items"), list) else []
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(12)
+        columns = min(max(len(items), 1), 3)
         for index, item in enumerate(items):
             if not isinstance(item, dict):
                 continue
-            card = _panel(elevated=True)
+            accent = self.palette["success"] if item.get("pros") else self.palette["accent_2"]
+            card = self._panel(elevated=True, accent=accent)
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(16, 14, 16, 14)
+            card_layout.setSpacing(8)
             card_layout.addWidget(_title(str(item.get("title") or f"Item {index + 1}"), "SmallTitle"))
             if item.get("text"):
                 card_layout.addWidget(_body(str(item.get("text")), self.body_size))
             self._add_points(card_layout, item)
-            grid.addWidget(card, 0, index)
+            self._add_pros_cons(card_layout, item)
+            grid.addWidget(card, index // columns, index % columns)
         layout.addLayout(grid)
         return panel
 
     def _sequence(self, block: dict[str, Any], block_type: str) -> QWidget:
         title_map = {"steps": "Passos", "timeline": "Linha do tempo", "mistakes": "Erros comuns"}
-        panel = _panel(accent=COLORS["warning"] if block_type == "mistakes" else None)
+        accent = self.palette["danger"] if block_type == "mistakes" else self.palette["accent"]
+        panel = self._panel(accent=accent)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(10)
         layout.addWidget(_title(str(block.get("title") or title_map[block_type]), "SectionTitle", self.section_title_size))
+        if block_type == "mistakes":
+            layout.addWidget(_body("Revise estes pontos antes da prova.", self.body_size, COLORS["text"]))
         items = block.get("items") if isinstance(block.get("items"), list) else []
         for index, item in enumerate(items, start=1):
-            row = QHBoxLayout()
             item_data = item if isinstance(item, dict) else {"title": str(item), "text": "", "number": str(index)}
+            row = QHBoxLayout()
+            row.setSpacing(12)
             badge_text = "!" if block_type == "mistakes" else str(item_data.get("number") or index)
             badge = QLabel(badge_text)
             badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            badge.setFixedSize(30, 30)
+            badge.setFixedSize(34, 34)
             badge.setStyleSheet(
-                f"background: {COLORS['accent_dark']}; border: 1px solid {COLORS['border_hover']}; "
-                f"border-radius: 15px; color: {COLORS['text']}; font-weight: 800;"
+                f"background: {self.palette['card_soft']}; border: 1px solid {accent}; "
+                f"border-radius: 17px; color: {accent}; font-weight: 900;"
             )
             row.addWidget(badge)
-            content = QVBoxLayout()
+            content_panel = QFrame()
+            content_panel.setStyleSheet(
+                f"border-left: 2px solid {accent}; padding-left: 10px; background: transparent;"
+            )
+            content = QVBoxLayout(content_panel)
+            content.setContentsMargins(12, 0, 0, 4)
             content.setSpacing(4)
             title = str(item_data.get("title") or "")
             text = str(item_data.get("text") or "")
@@ -402,12 +640,12 @@ class SummaryVisualRenderer:
                 content.addWidget(_body(text, self.body_size))
             if not title and not text:
                 content.addWidget(_body(str(item), self.body_size))
-            row.addLayout(content, 1)
+            row.addWidget(content_panel, 1)
             layout.addLayout(row)
         return panel
 
     def _tags(self, block: dict[str, Any]) -> QWidget:
-        panel = _panel()
+        panel = self._panel()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(12)
@@ -418,12 +656,8 @@ class SummaryVisualRenderer:
         items = block.get("items") if isinstance(block.get("items"), list) else []
         columns = 4 if not self.presentation else 3
         for index, item in enumerate(items):
-            tag = QLabel(str(item))
+            tag = _chip(str(item), self.palette["accent_3"], self.palette["card_alt"])
             tag.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            tag.setStyleSheet(
-                f"background: {COLORS['accent_dark']}; border: 1px solid {COLORS['border']}; "
-                f"border-radius: 13px; padding: 7px 12px; color: {COLORS['text']}; font-weight: 650;"
-            )
             grid.addWidget(tag, index // columns, index % columns)
         layout.addLayout(grid)
         return panel
@@ -431,45 +665,67 @@ class SummaryVisualRenderer:
     def _definition_like(self, block: dict[str, Any], block_type: str) -> QWidget:
         title = str(block.get("title") or {"formula": "Formula", "definition": "Definicao", "example": "Exemplo"}[block_type])
         text = str(block.get("text") or block.get("definition") or block.get("content") or "")
-        accent = COLORS["accent"] if block_type != "example" else COLORS["success"]
-        panel = _panel(elevated=True, accent=accent)
+        accent = self.palette["accent"] if block_type != "example" else self.palette["success"]
+        panel = self._panel(elevated=True, accent=accent)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 18, 22, 18)
-        layout.setSpacing(8)
+        layout.setSpacing(10)
         layout.addWidget(_title(title, "SectionTitle", self.section_title_size))
         if text:
-            body = _body(text, self.body_size, COLORS["text"] if block_type == "formula" else COLORS["muted"])
-            layout.addWidget(body)
+            if block_type == "formula":
+                formula = QLabel(text)
+                formula.setWordWrap(True)
+                formula.setFont(QFont("Consolas", 18 if self.presentation else 15))
+                formula.setStyleSheet(
+                    f"background: {self.palette['card_soft']}; border: 1px solid {accent}; "
+                    f"border-radius: 14px; padding: 16px; color: {COLORS['text']}; font-weight: 800;"
+                )
+                layout.addWidget(formula)
+            else:
+                layout.addWidget(_body(text, self.body_size, COLORS["text"]))
         self._add_item_list(layout, block, strong_body=block_type == "formula")
         return panel
 
     def _flow(self, block: dict[str, Any]) -> QWidget:
-        panel = _panel()
+        panel = self._panel()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(14)
         layout.addWidget(_title(str(block.get("title") or "Fluxo"), "SectionTitle", self.section_title_size))
-        row = QHBoxLayout()
-        row.setSpacing(8)
         items = block.get("items") if isinstance(block.get("items"), list) else []
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(10)
+        row = 0
+        column = 0
+        max_columns = 5 if self.presentation else 7
         for index, item in enumerate(items):
+            if column >= max_columns:
+                row += 1
+                column = 0
             pill = QLabel(str(item))
+            pill.setWordWrap(True)
             pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pill.setStyleSheet(
-                f"background: {COLORS['card_alt']}; border: 1px solid {COLORS['border_hover']}; "
-                f"border-radius: 12px; padding: 9px 12px; color: {COLORS['text']}; font-weight: 700;"
+                f"background: {self.palette['card_alt']}; border: 1px solid {self.palette['accent']}; "
+                f"border-radius: 14px; padding: 10px 13px; color: {COLORS['text']}; font-weight: 800;"
             )
-            row.addWidget(pill)
+            grid.addWidget(pill, row, column)
+            column += 1
             if index < len(items) - 1:
+                if column >= max_columns:
+                    row += 1
+                    column = 0
                 arrow = QLabel("->")
-                arrow.setStyleSheet(f"color: {COLORS['accent_hover']}; font-weight: 900;")
-                row.addWidget(arrow)
-        row.addStretch()
-        layout.addLayout(row)
+                arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                arrow.setStyleSheet(f"color: {self.palette['accent_3']}; font-weight: 900; font-size: 18px;")
+                grid.addWidget(arrow, row, column)
+                column += 1
+        layout.addLayout(grid)
         return panel
 
     def _chart(self, block: dict[str, Any]) -> QWidget:
-        panel = _panel()
+        panel = self._panel()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(10)
@@ -477,12 +733,98 @@ class SummaryVisualRenderer:
         description = str(block.get("description") or "")
         if description:
             layout.addWidget(_body(description, self.body_size))
-        chart = ChartWidget(block, presentation=self.presentation)
-        chart.setStyleSheet(f"background: {COLORS['card']}; border-radius: 12px;")
+        chart = ChartWidget(block, presentation=self.presentation, palette=self.palette)
+        chart.setStyleSheet(f"background: {self.palette['card']}; border-radius: 14px;")
         layout.addWidget(chart)
         unit = str(block.get("unit") or "")
-        if unit:
-            layout.addWidget(_body(f"Unidade: {unit}", 12, COLORS["weak"]))
+        interpretation = str(block.get("interpretation") or block.get("insight") or "")
+        footer = "Unidade: " + unit if unit else ""
+        if footer:
+            layout.addWidget(_body(footer, 12, COLORS["weak"]))
+        if interpretation:
+            layout.addWidget(_chip(f"Interpretacao: {interpretation}", self.palette["accent_3"], self.palette["card_soft"]))
+        return panel
+
+    def _concept_map(self, block: dict[str, Any], block_type: str) -> QWidget:
+        panel = self._panel(accent=self.palette["accent_2"])
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(22, 20, 22, 20)
+        layout.setSpacing(14)
+        title = "Mapa mental" if block_type == "mindmap" else "Mapa de conceitos"
+        layout.addWidget(_title(str(block.get("title") or title), "SectionTitle", self.section_title_size))
+        text = str(block.get("text") or "")
+        if text:
+            layout.addWidget(_body(text, self.body_size))
+        items = block.get("items") if isinstance(block.get("items"), list) else []
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(12)
+        columns = 3 if not self.presentation else 2
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            node = self._panel(elevated=True, accent=[self.palette["accent"], self.palette["accent_2"], self.palette["accent_3"]][index % 3])
+            node_layout = QVBoxLayout(node)
+            node_layout.setContentsMargins(14, 12, 14, 12)
+            node_layout.setSpacing(6)
+            node_layout.addWidget(_title(str(item.get("title") or f"No {index + 1}"), "SmallTitle"))
+            if item.get("text"):
+                node_layout.addWidget(_body(str(item.get("text")), self.body_size))
+            self._add_points(node_layout, item)
+            grid.addWidget(node, index // columns, index % columns)
+        layout.addLayout(grid)
+        return panel
+
+    def _exam_trap(self, block: dict[str, Any]) -> QWidget:
+        trap = dict(block)
+        trap["variant"] = "exam"
+        trap.setdefault("title", "Pegadinha de prova")
+        return self._callout(trap)
+
+    def _source_quote(self, block: dict[str, Any]) -> QWidget:
+        panel = self._panel(elevated=True, accent=self.palette["accent_3"], tone="soft")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(10)
+        layout.addWidget(_title(str(block.get("title") or "Trecho fonte"), "SectionTitle", self.section_title_size))
+        quote = str(block.get("quote") or block.get("text") or block.get("content") or "")
+        if quote:
+            quote_label = QLabel(f'"{quote}"')
+            quote_label.setWordWrap(True)
+            quote_label.setStyleSheet(
+                f"color: {COLORS['text']}; font-size: {self.body_size + 2}px; "
+                f"font-weight: 700; line-height: 1.4;"
+            )
+            layout.addWidget(quote_label)
+        source = str(block.get("source") or "")
+        if source:
+            layout.addWidget(_chip(source, self.palette["accent_3"], self.palette["card"]))
+        return panel
+
+    def _quiz_preview(self, block: dict[str, Any]) -> QWidget:
+        panel = self._panel(accent=self.palette["accent"])
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(22, 20, 22, 20)
+        layout.setSpacing(12)
+        layout.addWidget(_title(str(block.get("title") or "Como pode cair"), "SectionTitle", self.section_title_size))
+        items = block.get("items") if isinstance(block.get("items"), list) else []
+        for index, item in enumerate(items, start=1):
+            if not isinstance(item, dict):
+                layout.addWidget(_body(str(item), self.body_size))
+                continue
+            card = self._panel(elevated=True, accent=self.palette["accent_3"])
+            card_layout = QHBoxLayout(card)
+            card_layout.setContentsMargins(14, 12, 14, 12)
+            badge = _chip(f"Q{index}", self.palette["accent_3"], self.palette["card_soft"])
+            card_layout.addWidget(badge)
+            text_box = QVBoxLayout()
+            text_box.setSpacing(4)
+            text_box.addWidget(_title(str(item.get("title") or item.get("question") or f"Questao {index}"), "SmallTitle"))
+            text = str(item.get("text") or item.get("answer") or "")
+            if text:
+                text_box.addWidget(_body(text, self.body_size))
+            card_layout.addLayout(text_box, 1)
+            layout.addWidget(card)
         return panel
 
     def _add_item_list(self, layout: QVBoxLayout, block: dict[str, Any], strong_body: bool = False) -> None:
@@ -491,7 +833,7 @@ class SummaryVisualRenderer:
             if not isinstance(item, dict):
                 layout.addWidget(_body(str(item), self.body_size))
                 continue
-            card = _panel(elevated=True)
+            card = self._panel(elevated=True)
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(14, 12, 14, 12)
             card_layout.setSpacing(6)
@@ -504,12 +846,26 @@ class SummaryVisualRenderer:
                     _body(text, self.body_size, COLORS["text"] if strong_body else COLORS["muted"])
                 )
             self._add_points(card_layout, item)
+            self._add_pros_cons(card_layout, item)
             layout.addWidget(card)
 
     def _add_points(self, layout: QVBoxLayout, item: dict[str, Any]) -> None:
         points = item.get("points") if isinstance(item.get("points"), list) else []
         for point in points:
             layout.addWidget(_body(f"- {point}", self.body_size))
+
+    def _add_pros_cons(self, layout: QVBoxLayout, item: dict[str, Any]) -> None:
+        pros = item.get("pros") if isinstance(item.get("pros"), list) else []
+        cons = item.get("cons") if isinstance(item.get("cons"), list) else []
+        for title, values, color in (
+            ("Pros", pros, self.palette["success"]),
+            ("Contras", cons, self.palette["danger"]),
+        ):
+            if not values:
+                continue
+            layout.addWidget(_chip(title, color, self.palette["card_soft"]))
+            for value in values:
+                layout.addWidget(_body(f"- {value}", self.body_size))
 
 
 class VisualSummaryWidget(QWidget):
@@ -552,7 +908,10 @@ class VisualSummaryWidget(QWidget):
             )
             self.layout.addStretch()
             return
-        SummaryVisualRenderer(self.presentation).render_summary(self.layout, data)
+        SummaryVisualRenderer(
+            self.presentation,
+            style=data.get("style") or data.get("theme"),
+        ).render_summary(self.layout, data)
         self.layout.addStretch()
 
 
@@ -617,7 +976,13 @@ class PresentationDialog(QDialog):
         slide_layout = QVBoxLayout(wrapper)
         slide_layout.setContentsMargins(34, 26, 34, 26)
         slide_layout.addStretch(1)
-        slide_layout.addWidget(SummaryVisualRenderer(presentation=True).render_block(slide), 4)
+        slide_layout.addWidget(
+            SummaryVisualRenderer(
+                presentation=True,
+                style=(self.data or {}).get("style") if isinstance(self.data, dict) else "auto",
+            ).render_block(slide),
+            4,
+        )
         slide_layout.addStretch(1)
         self.body.addWidget(wrapper, 1)
         total = len(self.slides)

@@ -12,6 +12,7 @@ def test_build_prompt_includes_structure_options_and_extracted_content() -> None
         question_count=3,
         difficulty="intermediario",
         language_style="clara",
+        visual_style="neon",
     )
 
     prompt = PromptBuilder().build(
@@ -25,17 +26,23 @@ def test_build_prompt_includes_structure_options_and_extracted_content() -> None
     assert '"schema_version": "learnkit.study_package.v1"' in prompt
     assert '"summary_text"' in prompt
     assert '"summary_visual"' in prompt
+    assert '"style": "neon"' in prompt
     assert '"flashcards"' in prompt
     assert '"questions"' in prompt
     assert '"type": "chart"' in prompt
     assert '"type": "mistakes"' in prompt
     assert '"type": "flow"' in prompt
+    assert '"type": "exam_trap"' in prompt
+    assert '"type": "quiz_preview"' in prompt
     assert '"step": 1' in prompt
-    assert "hero, section, cards, callout, table" in prompt
+    assert "hero, cards, callout" in prompt
+    assert "mindmap, concept_map, exam_trap" in prompt
     assert "Nunca envie codigo Python, HTML ou JS" in prompt
+    assert "Nao envie HTML bruto" in prompt
     assert "5 flashcards" in prompt
     assert "3 perguntas" in prompt
     assert "intermediario" in prompt
+    assert "Estilo visual do resumo: neon" in prompt
     assert "Texto sobre modelo relacional" in prompt
     assert "Use apenas o conteudo fornecido" in prompt
     assert "Responda exclusivamente com JSON valido" in prompt
@@ -54,5 +61,6 @@ def test_build_prompt_keeps_markdown_legacy_format_when_requested() -> None:
     assert "# RESUMO_VISUAL" in prompt
     assert "# FLASHCARDS" in prompt
     assert "# PERGUNTAS" in prompt
+    assert '"style": "auto"' in prompt
     assert '"chart_type": "horizontal_bar"' in prompt
     assert '"mistake": "Erro provavel."' in prompt
