@@ -123,6 +123,10 @@ def test_visual_summary_widget_renders_rich_blocks_offscreen() -> None:
 
     assert widget.findChildren(QScrollArea)
     assert dialog.counter.text() == "1 / 5"
+    assert dialog.progress.value() == 20
+    assert dialog.fullscreen_button.isCheckable()
+    assert not dialog.previous_button.isEnabled()
+    assert dialog.next_button.isEnabled()
 
 
 def test_visual_summary_widget_renders_non_standard_item_fields() -> None:

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QProgressBar,
     QPushButton,
     QScrollArea,
     QTableWidget,
@@ -885,8 +886,27 @@ class PresentationDialog(QDialog):
         self.header.addWidget(label(title, "Title"))
         self.header.addStretch()
         self.header.addWidget(self.counter)
+        self.fullscreen_button = QPushButton("Tela cheia")
+        self.fullscreen_button.setCheckable(True)
+        self.fullscreen_button.setToolTip("Alternar entre janela e tela cheia (F11)")
+        self.fullscreen_button.clicked.connect(self._toggle_fullscreen)
+        self.header.addWidget(self.fullscreen_button)
         self.header.addWidget(close)
         self.root.addLayout(self.header)
+
+        self.progress = QProgressBar()
+        self.progress.setObjectName("PresentationProgress")
+        self.progress.setRange(0, 100)
+        self.progress.setTextVisible(False)
+        self.progress.setFixedHeight(6)
+        self.progress.setAccessibleName("Progresso da apresentação")
+        self.progress.setStyleSheet(
+            f"QProgressBar#PresentationProgress {{ background: {COLORS['card_alt']}; "
+            f"border: 0; border-radius: 3px; }} "
+            f"QProgressBar#PresentationProgress::chunk {{ background: {self.preset.palette['accent']}; "
+            "border-radius: 3px; }}"
+        )
+        self.root.addWidget(self.progress)
 
         self.body = QVBoxLayout()
         self.body.setContentsMargins(0, 0, 0, 0)
@@ -911,6 +931,8 @@ class PresentationDialog(QDialog):
         if not self.slides:
             self.body.addWidget(EmptyState("Sem slides visuais.", "Este bloco nao possui secoes visuais validas."))
             self.counter.setText("0 / 0")
+            self.progress.setValue(0)
+            self.fullscreen_button.setEnabled(False)
             return
         slide = self.slides[self.index]
         wrapper = QWidget()
@@ -937,6 +959,8 @@ class PresentationDialog(QDialog):
         self.counter.setText(f"{self.index + 1} / {total}")
         self.previous_button.setEnabled(self.index > 0)
         self.next_button.setEnabled(self.index < total - 1)
+        self.progress.setValue(round((self.index + 1) * 100 / total))
+        self.fullscreen_button.setEnabled(True)
 
     def next(self) -> None:
         if self.slides:
@@ -948,6 +972,24 @@ class PresentationDialog(QDialog):
             self.index = max(self.index - 1, 0)
             self.render()
 
+    def _toggle_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.showNormal()
+            self.fullscreen_button.setChecked(False)
+            return
+        self.showFullScreen()
+        self.fullscreen_button.setChecked(True)
+
+    def _go_first(self) -> None:
+        if self.slides:
+            self.index = 0
+            self.render()
+
+    def _go_last(self) -> None:
+        if self.slides:
+            self.index = len(self.slides) - 1
+            self.render()
+
     def keyPressEvent(self, event: QKeyEvent) -> None:  # type: ignore[override]
         if event.key() in (Qt.Key.Key_Right, Qt.Key.Key_Down, Qt.Key.Key_Space):
             self.next()
@@ -955,7 +997,20 @@ class PresentationDialog(QDialog):
         if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Up, Qt.Key.Key_Backspace):
             self.previous()
             return
+        if event.key() == Qt.Key.Key_Home:
+            self._go_first()
+            return
+        if event.key() == Qt.Key.Key_End:
+            self._go_last()
+            return
+        if event.key() == Qt.Key.Key_F11:
+            self._toggle_fullscreen()
+            return
         if event.key() == Qt.Key.Key_Escape:
-            self.accept()
+            if self.isFullScreen():
+                self.showNormal()
+                self.fullscreen_button.setChecked(False)
+            else:
+                self.accept()
             return
         super().keyPressEvent(event)
