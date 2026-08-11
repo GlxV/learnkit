@@ -61,18 +61,22 @@ VISUAL_STYLE_OPTIONS = visual_preset_options()
 
 
 class ExtractionWorker(QObject):
-    finished = Signal(object)
-    failed = Signal(str)
+    finished = Signal(int, object)
+    failed = Signal(int, str)
 
-    def __init__(self, files: list[Path]) -> None:
+    def __init__(self, files: list[Path], generation: int) -> None:
         super().__init__()
-        self.files = files
+        self.files = list(files)
+        self.generation = generation
 
     def run(self) -> None:
         try:
-            self.finished.emit(FileExtractor().extract_files(self.files))
+            self.finished.emit(
+                self.generation,
+                FileExtractor().extract_files(self.files),
+            )
         except Exception as exc:
-            self.failed.emit(str(exc))
+            self.failed.emit(self.generation, str(exc))
 
 
 class DropArea(QLabel):
@@ -165,6 +169,7 @@ class ImportPage(QWidget):
         self.current_block: StudyBlock | None = None
         self.worker_thread: QThread | None = None
         self.worker: ExtractionWorker | None = None
+        self._extraction_generation = 0
         self.result_buttons: list[QPushButton] = []
         self.step_badges: dict[int, QLabel] = {}
         self.step_statuses: dict[int, QLabel] = {}
@@ -1092,22 +1097,50 @@ class ImportPage(QWidget):
             self.prepare_status.setText("Nao foi possivel extrair texto suficiente dos arquivos.")
             self._set_step_status(3, "error")
             return
-        self._generate_prompt()
-        self._copy_prompt()
-        self._open_external_ai()
-        set_button_loading(self.prepare_button, False)
-        self.prepare_status.setText(
-            "Prompt copiado. Cole na IA aberta no navegador, aguarde a resposta e volte para colar no LearnKit."
-        )
-        self._set_step_status(3, "done")
-        self._update_context_card()
+        try:
+            self._generate_prompt()
+            if self._copy_prompt() is False:
+                self.prepare_status.setText(
+                    "Prompt gerado, mas nao foi possivel copia-lo para a area de transferencia."
+                )
+                self._set_step_status(3, "error")
+                return
+            browser_opened = self._open_external_ai()
+            if browser_opened is False:
+                self.prepare_status.setText(
+                    "Prompt copiado, mas o navegador nao abriu. Abra o provedor manualmente."
+                )
+                self._set_step_status(3, "warning")
+                return
+            self.prepare_status.setText(
+                "Prompt copiado. Cole na IA aberta no navegador, aguarde a resposta e volte para colar no LearnKit."
+            )
+            self._set_step_status(3, "done")
+        except Exception as exc:
+            self.prepare_status.setText(f"Falha ao preparar o pacote: {exc}")
+            self._set_step_status(3, "error")
+            show_toast(self, f"Falha ao preparar o pacote: {exc}", "error")
+            log_action("study_package_prepare_failed", error=str(exc))
+        finally:
+            set_button_loading(self.prepare_button, False)
+            self._update_context_card()
 
-    def _open_external_ai(self) -> None:
+    def _open_external_ai(self) -> bool:
         provider = get_ai_provider(str(self.ai_provider_combo.currentData() or "gemini"))
         url = provider.url
-        webbrowser.open(url)
+        try:
+            opened = webbrowser.open(url)
+        except Exception as exc:
+            show_toast(self, f"Nao foi possivel abrir {provider.label}: {exc}", "error")
+            log_action("external_ai_open_failed", provider=provider.key, error=str(exc))
+            return False
+        if not opened:
+            show_toast(self, f"Nao foi possivel abrir {provider.label} no navegador.", "error")
+            log_action("external_ai_open_failed", provider=provider.key)
+            return False
         show_toast(self, f"{provider.label} aberto no navegador.", "info")
         log_action("external_ai_opened", provider=provider.key, url=url)
+        return True
 
     def _open_ai_workspace(self) -> None:
         prompt = self.prompt_preview.toPlainText().strip()
@@ -1160,6 +1193,7 @@ class ImportPage(QWidget):
         log_action("files_added", count=added)
 
     def _clear_files(self) -> None:
+        self._invalidate_extraction_context()
         self.selected_files = []
         self.file_statuses = {}
         self.extraction_result = None
@@ -1198,6 +1232,7 @@ class ImportPage(QWidget):
         log_action("file_removed", file=path.name)
 
     def _reset_outputs_after_file_change(self) -> None:
+        self._invalidate_extraction_context()
         self.extraction_result = None
         self.prompt_text = ""
         self.parsed_response = None
@@ -1237,6 +1272,11 @@ class ImportPage(QWidget):
             show_toast(self, "Selecione pelo menos um arquivo.", "warning")
             self._set_step_status(2, "warning")
             return
+        if self.has_active_extraction():
+            show_toast(self, "A extracao ja esta em andamento.", "info")
+            return
+        self._extraction_generation += 1
+        generation = self._extraction_generation
         self._set_step_status(3, "active")
         for file in self.selected_files:
             self.file_statuses[str(file)] = ("extraindo", "")
@@ -1246,20 +1286,32 @@ class ImportPage(QWidget):
             set_button_loading(self.prepare_button, True, "Preparando...")
         self.extract_progress.setRange(0, 0)
         self.extract_progress.setVisible(True)
-        self.worker_thread = QThread(self)
-        self.worker = ExtractionWorker(self.selected_files)
-        self.worker.moveToThread(self.worker_thread)
-        self.worker_thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self._extraction_finished)
-        self.worker.failed.connect(self._extraction_failed)
-        self.worker.finished.connect(self.worker_thread.quit)
-        self.worker.failed.connect(self.worker_thread.quit)
-        self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-        self.worker_thread.start()
+        thread = QThread(self)
+        worker = ExtractionWorker(self.selected_files, generation)
+        self.worker_thread = thread
+        self.worker = worker
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._extraction_finished)
+        worker.failed.connect(self._extraction_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        worker.failed.connect(worker.deleteLater)
+        thread.finished.connect(lambda: self._extraction_thread_finished(thread))
+        thread.finished.connect(thread.deleteLater)
+        thread.start()
         show_toast(self, "Extração iniciada.", "info")
         log_action("extraction_started", file_count=len(self.selected_files))
 
-    def _extraction_finished(self, result: FileExtractionResult) -> None:
+    def _extraction_finished(self, generation: int, result: FileExtractionResult) -> None:
+        if generation != self._extraction_generation:
+            self._reset_extraction_button()
+            self.prepare_after_extraction = False
+            if hasattr(self, "prepare_button"):
+                set_button_loading(self.prepare_button, False)
+            log_action("stale_extraction_ignored", generation=generation)
+            return
         self.extraction_result = result
         self.text_preview.setPlainText(result.combined_content.text)
         warnings = [warning for item in result.files for warning in item.extraction_warnings]
@@ -1309,8 +1361,14 @@ class ImportPage(QWidget):
         if self.prepare_after_extraction:
             self._finish_prepare_study_package()
 
-    def _extraction_failed(self, message: str) -> None:
+    def _extraction_failed(self, generation: int, message: str) -> None:
         self._reset_extraction_button()
+        if generation != self._extraction_generation:
+            self.prepare_after_extraction = False
+            if hasattr(self, "prepare_button"):
+                set_button_loading(self.prepare_button, False)
+            log_action("stale_extraction_failure_ignored", generation=generation)
+            return
         self._set_step_status(3, "error")
         self.prepare_after_extraction = False
         if hasattr(self, "prepare_button"):
@@ -1322,6 +1380,25 @@ class ImportPage(QWidget):
         self.extract_progress.setVisible(False)
         self.extract_progress.setRange(0, 1)
         set_button_loading(self.extract_button, False)
+
+    def _invalidate_extraction_context(self) -> None:
+        self._extraction_generation += 1
+        self.prepare_after_extraction = False
+        if hasattr(self, "prepare_button"):
+            set_button_loading(self.prepare_button, False)
+
+    def _extraction_thread_finished(self, thread: QThread) -> None:
+        if self.worker_thread is thread:
+            self.worker_thread = None
+            self.worker = None
+
+    def has_active_extraction(self) -> bool:
+        if self.worker_thread is None:
+            return False
+        try:
+            return self.worker_thread.isRunning()
+        except RuntimeError:
+            return False
 
     def _toggle_options(self) -> None:
         visible = not self.options_panel.isVisible()
@@ -1356,21 +1433,27 @@ class ImportPage(QWidget):
         log_action("prompt_generated", chars=len(self.prompt_text))
         self._update_context_card()
 
-    def _copy_prompt(self) -> None:
+    def _copy_prompt(self) -> bool:
         prompt = self.prompt_preview.toPlainText()
         if not prompt.strip():
             show_toast(self, "Gere um prompt antes de copiar.", "warning")
-            return
-        QApplication.clipboard().setText(prompt)
+            return False
+        try:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(prompt)
+            if clipboard.text() != prompt:
+                raise OSError("a area de transferencia nao confirmou o conteudo")
+        except Exception as exc:
+            show_toast(self, f"Nao foi possivel copiar o prompt: {exc}", "error")
+            log_action("prompt_copy_failed", error=str(exc))
+            return False
         flash_button_success(self.copy_button, "Copiado!")
         show_toast(self, "Prompt copiado para a area de transferencia.", "success")
         log_action("prompt_copied", chars=len(prompt))
+        return True
 
     def _open_gemini(self) -> None:
-        provider = get_ai_provider("gemini")
-        webbrowser.open(provider.url)
-        show_toast(self, f"{provider.label} aberto no navegador.", "info")
-        log_action("external_ai_opened", provider=provider.key, url=provider.url)
+        self._open_external_ai()
 
     def _validate_response(self) -> None:
         raw = self.ai_response.toPlainText().strip()

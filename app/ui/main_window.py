@@ -264,6 +264,18 @@ class MainWindow(QMainWindow):
         if hasattr(self, "toast"):
             self.toast.reposition()
 
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        import_page = getattr(self, "pages", {}).get("import")
+        if import_page is not None and import_page.has_active_extraction():
+            QMessageBox.warning(
+                self,
+                "Extracao em andamento",
+                "Aguarde a extracao terminar antes de fechar o LearnKit.",
+            )
+            event.ignore()
+            return
+        super().closeEvent(event)
+
     def _polish_interactive_widgets(self) -> None:
         for button in self.findChildren(QAbstractButton):
             button.setCursor(
