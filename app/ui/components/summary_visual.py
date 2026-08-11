@@ -59,6 +59,7 @@ def _panel(
 
 def _body(text: str, size: int = 14, color: str | None = None) -> QLabel:
     widget = label(text, "Muted")
+    widget.setTextFormat(Qt.TextFormat.PlainText)
     widget.setWordWrap(True)
     widget.setStyleSheet(
         f"color: {color or COLORS['muted']}; font-size: {size}px; line-height: 1.35;"
@@ -68,6 +69,7 @@ def _body(text: str, size: int = 14, color: str | None = None) -> QLabel:
 
 def _title(text: str, kind: str = "SectionTitle", size: int | None = None) -> QLabel:
     widget = label(text, kind)
+    widget.setTextFormat(Qt.TextFormat.PlainText)
     widget.setWordWrap(True)
     if size is not None:
         widget.setStyleSheet(f"font-size: {size}px; font-weight: 800; color: {COLORS['text']};")
@@ -76,6 +78,7 @@ def _title(text: str, kind: str = "SectionTitle", size: int | None = None) -> QL
 
 def _chip(text: str, color: str, background: str | None = None) -> QLabel:
     chip = QLabel(text)
+    chip.setTextFormat(Qt.TextFormat.PlainText)
     chip.setWordWrap(True)
     chip.setStyleSheet(
         f"background: {background or COLORS['accent_dark']}; border: 1px solid {color}; "
@@ -95,11 +98,18 @@ class ChartWidget(QWidget):
         self.block = block
         self.presentation = presentation
         self.palette = palette or _visual_palette()
-        self.setMinimumHeight(340 if presentation else 230)
+        self.setMinimumHeight(self.sizeHint().height())
         self.setSizePolicy(self.sizePolicy().horizontalPolicy(), self.sizePolicy().verticalPolicy())
 
     def sizeHint(self) -> QSize:  # type: ignore[override]
-        return QSize(780, 360 if self.presentation else 240)
+        base_height = 360 if self.presentation else 240
+        chart_type = str(self.block.get("chart_type") or "bar")
+        values = self.block.get("values")
+        row_count = len(values) if isinstance(values, list) else 0
+        if chart_type in {"horizontal_bar", "progress"}:
+            row_height = 48 if self.presentation else 40
+            base_height = max(base_height, row_count * row_height + 44)
+        return QSize(780, base_height)
 
     def paintEvent(self, event) -> None:  # type: ignore[override]
         super().paintEvent(event)
@@ -129,8 +139,8 @@ class ChartWidget(QWidget):
         rect = self.rect().adjusted(26, 18, -26, -34)
         maximum = max(values) or 1
         count = len(values)
-        gap = 14
-        bar_width = max(16, int((rect.width() - gap * (count - 1)) / max(count, 1)))
+        gap = min(14, max(1, int(rect.width() / max(count * 4, 1))))
+        bar_width = max(1, int((rect.width() - gap * (count - 1)) / max(count, 1)))
         accent = QColor(self.palette["accent"])
         muted = QColor(COLORS["muted"])
         grid_pen = QPen(QColor(self.palette["border"]))
@@ -405,6 +415,7 @@ class SummaryVisualRenderer:
             icon = str(item.get("icon") or item.get("emoji") or "").strip()
             if icon:
                 icon_label = QLabel(icon[:3])
+                icon_label.setTextFormat(Qt.TextFormat.PlainText)
                 icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 icon_label.setFixedSize(34, 34)
                 icon_label.setStyleSheet(
@@ -548,6 +559,7 @@ class SummaryVisualRenderer:
             row.setSpacing(12)
             badge_text = "!" if block_type == "mistakes" else str(item_data.get("number") or index)
             badge = QLabel(badge_text)
+            badge.setTextFormat(Qt.TextFormat.PlainText)
             badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
             badge.setFixedSize(34, 34)
             badge.setStyleSheet(
@@ -604,6 +616,7 @@ class SummaryVisualRenderer:
         if text:
             if block_type == "formula":
                 formula = QLabel(text)
+                formula.setTextFormat(Qt.TextFormat.PlainText)
                 formula.setWordWrap(True)
                 formula.setFont(QFont("Consolas", 18 if self.presentation else 15))
                 formula.setStyleSheet(
@@ -634,6 +647,7 @@ class SummaryVisualRenderer:
                 row += 1
                 column = 0
             pill = QLabel(str(item))
+            pill.setTextFormat(Qt.TextFormat.PlainText)
             pill.setWordWrap(True)
             pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
             pill.setStyleSheet(
@@ -647,6 +661,7 @@ class SummaryVisualRenderer:
                     row += 1
                     column = 0
                 arrow = QLabel("->")
+                arrow.setTextFormat(Qt.TextFormat.PlainText)
                 arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 arrow.setStyleSheet(f"color: {self.palette['accent_3']}; font-weight: 900; font-size: 18px;")
                 grid.addWidget(arrow, row, column)
@@ -720,6 +735,7 @@ class SummaryVisualRenderer:
         quote = str(block.get("quote") or block.get("text") or block.get("content") or "")
         if quote:
             quote_label = QLabel(f'"{quote}"')
+            quote_label.setTextFormat(Qt.TextFormat.PlainText)
             quote_label.setWordWrap(True)
             quote_label.setStyleSheet(
                 f"color: {COLORS['text']}; font-size: {self.body_size + 2}px; "
@@ -870,6 +886,7 @@ class PresentationDialog(QDialog):
         self.preset = get_visual_preset(self.data.get("style") if self.data else "auto")
         self.slides = visual_summary_slides(self.data)
         self.index = 0
+        self._was_maximized_before_fullscreen = False
         self.root = QVBoxLayout(self)
         self.root.setContentsMargins(
             self.preset.spacing.panel_margin,
@@ -974,11 +991,19 @@ class PresentationDialog(QDialog):
 
     def _toggle_fullscreen(self) -> None:
         if self.isFullScreen():
-            self.showNormal()
-            self.fullscreen_button.setChecked(False)
+            self._exit_fullscreen()
             return
+        self._was_maximized_before_fullscreen = self.isMaximized()
         self.showFullScreen()
         self.fullscreen_button.setChecked(True)
+
+    def _exit_fullscreen(self) -> None:
+        if self._was_maximized_before_fullscreen:
+            self.showMaximized()
+        else:
+            self.showNormal()
+        self._was_maximized_before_fullscreen = False
+        self.fullscreen_button.setChecked(False)
 
     def _go_first(self) -> None:
         if self.slides:
@@ -1008,8 +1033,7 @@ class PresentationDialog(QDialog):
             return
         if event.key() == Qt.Key.Key_Escape:
             if self.isFullScreen():
-                self.showNormal()
-                self.fullscreen_button.setChecked(False)
+                self._exit_fullscreen()
             else:
                 self.accept()
             return
