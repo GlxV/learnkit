@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.application.dto.visual_preset import get_visual_preset
+
 
 SUPPORTED_VISUAL_BLOCK_TYPES = {
     "hero",
@@ -464,8 +466,7 @@ def _callout_variant(block: dict[str, Any], raw_type: str) -> str:
 
 
 def _visual_style(value: object) -> str:
-    style = _text(value, "auto").lower()
-    return style if style in {"auto", "prova", "lab", "neon", "retro", "minimalista"} else "auto"
+    return get_visual_preset(value).key
 
 
 def _default_title(block_type: str) -> str:

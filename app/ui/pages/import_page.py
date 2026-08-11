@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.application.dto.study_package import ImportDestinationDTO, StudyPackageDTO, StudyPackageImportDTO
+from app.application.dto.visual_preset import visual_preset_options
 from app.application.query_services.study_session_query_service import StudySessionQueryService
 from app.application.query_services.ui_data_provider import UISubject
 from app.application.use_cases.generate_prompt import GeneratePromptUseCase
@@ -55,14 +56,7 @@ AI_PROVIDERS = {
     "Claude": "https://claude.ai/",
 }
 
-VISUAL_STYLE_OPTIONS = [
-    ("Auto", "auto"),
-    ("Prova", "prova"),
-    ("Lab", "lab"),
-    ("Neon", "neon"),
-    ("Retro", "retro"),
-    ("Minimalista", "minimalista"),
-]
+VISUAL_STYLE_OPTIONS = visual_preset_options()
 
 
 class ExtractionWorker(QObject):

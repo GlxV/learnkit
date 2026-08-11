@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.application.dto.visual_preset import get_visual_preset
 from app.core.models.extracted_content import ExtractedContent
 
 
@@ -50,6 +51,7 @@ class PromptBuilder:
         extracted_content: ExtractedContent,
         selected: PromptOptions,
     ) -> str:
+        preset = get_visual_preset(selected.visual_style)
         return f"""Voce e um assistente de estudos.
 
 Transforme o conteudo fornecido em um pacote de estudo organizado para o LearnKit.
@@ -61,7 +63,7 @@ Contexto:
 - Dificuldade desejada: {selected.difficulty}
 - Linguagem: {selected.language_style}
 - Tipo de resumo: {selected.summary_mode}
-- Estilo visual do resumo: {selected.visual_style}
+- Estilo visual do resumo: {preset.key}
 
 Regras obrigatorias:
 - Use apenas o conteudo fornecido.
@@ -72,7 +74,8 @@ Regras obrigatorias:
 - Gere ate {selected.question_count} perguntas de multipla escolha com 4 alternativas.
 - O gabarito deve ser somente A, B, C ou D.
 - Crie um resumo texto objetivo, com visao geral e topicos principais.
-- Em summary_visual, gere um objeto JSON estruturado compativel com o LearnKit e inclua "style": "{selected.visual_style}".
+- Em summary_visual, gere um objeto JSON estruturado compativel com o LearnKit e inclua "style": "{preset.key}".
+- Diretriz do preset visual: {preset.prompt_guidance}
 - O resumo visual deve parecer uma apresentacao/mini-site de estudo premium, nao HTML simples.
 - Use blocos variados no summary_visual, evitando concentrar tudo em section: hero, cards, callout,
   table, comparison, steps, timeline, mistakes, formula, flow ou chart quando fizer sentido.
@@ -96,7 +99,7 @@ Formato JSON esperado:
   "summary_visual": {{
     "title": "{block_title}",
     "subtitle": "Resumo visual para revisao",
-    "style": "{selected.visual_style}",
+    "style": "{preset.key}",
     "sections": [
       {{
         "type": "hero",
@@ -197,6 +200,7 @@ Conteudo fornecido:
         extracted_content: ExtractedContent,
         selected: PromptOptions,
     ) -> str:
+        preset = get_visual_preset(selected.visual_style)
         return f"""Voce e um assistente de estudos.
 
 Transforme o conteudo fornecido em um pacote de estudo organizado para o LearnKit.
@@ -208,7 +212,7 @@ Contexto:
 - Dificuldade desejada: {selected.difficulty}
 - Linguagem: {selected.language_style}
 - Tipo de resumo: {selected.summary_mode}
-- Estilo visual do resumo: {selected.visual_style}
+- Estilo visual do resumo: {preset.key}
 
 Regras obrigatorias:
 - Use apenas o conteudo fornecido.
@@ -222,7 +226,8 @@ Regras obrigatorias:
 - Gere ate {selected.question_count} perguntas de multipla escolha com 4 alternativas. Se o conteudo for pequeno, gere menos, mas mantenha o formato.
 - O gabarito deve ser somente A, B, C ou D.
 - Crie um resumo texto objetivo, com visao geral e topicos principais.
-- Em # RESUMO_VISUAL, gere JSON estruturado compativel com o LearnKit e inclua "style": "{selected.visual_style}".
+- Em # RESUMO_VISUAL, gere JSON estruturado compativel com o LearnKit e inclua "style": "{preset.key}".
+- Diretriz do preset visual: {preset.prompt_guidance}
 - O resumo visual deve parecer uma apresentacao/mini-site de estudo premium, nao HTML simples.
 - Use blocos variados: hero, cards, callout, table, comparison, steps, timeline, mistakes,
   formula, flow e chart quando fizer sentido. Evite usar somente section.
@@ -257,7 +262,7 @@ Formato exato esperado:
 {{
   "title": "{block_title}",
   "subtitle": "Resumo visual para revisao",
-  "style": "{selected.visual_style}",
+  "style": "{preset.key}",
   "sections": [
     {{
       "type": "hero",

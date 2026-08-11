@@ -25,96 +25,13 @@ from app.application.dto.visual_summary import (
     parse_visual_summary,
     visual_summary_slides,
 )
+from app.application.dto.visual_preset import get_visual_preset
 from app.ui.components.cards import EmptyState, label
 from app.ui.theme import COLORS
 
 
-VISUAL_PALETTES: dict[str, dict[str, str]] = {
-    "auto": {
-        "background": "#050B14",
-        "card": "#091426",
-        "card_alt": "#101B34",
-        "card_soft": "#14213D",
-        "border": "#263A60",
-        "accent": "#60A5FA",
-        "accent_2": "#8B5CF6",
-        "accent_3": "#22D3EE",
-        "warning": "#F59E0B",
-        "danger": "#F87171",
-        "success": "#34D399",
-    },
-    "prova": {
-        "background": "#07111F",
-        "card": "#0D1728",
-        "card_alt": "#142033",
-        "card_soft": "#18263A",
-        "border": "#2B3B55",
-        "accent": "#38BDF8",
-        "accent_2": "#818CF8",
-        "accent_3": "#FBBF24",
-        "warning": "#F59E0B",
-        "danger": "#FB7185",
-        "success": "#22C55E",
-    },
-    "lab": {
-        "background": "#03130F",
-        "card": "#071D17",
-        "card_alt": "#0D2A21",
-        "card_soft": "#12382C",
-        "border": "#1F4D3D",
-        "accent": "#2DD4BF",
-        "accent_2": "#22C55E",
-        "accent_3": "#A3E635",
-        "warning": "#EAB308",
-        "danger": "#F87171",
-        "success": "#4ADE80",
-    },
-    "neon": {
-        "background": "#050716",
-        "card": "#0A1028",
-        "card_alt": "#111A3D",
-        "card_soft": "#172554",
-        "border": "#334155",
-        "accent": "#22D3EE",
-        "accent_2": "#A78BFA",
-        "accent_3": "#3B82F6",
-        "warning": "#FACC15",
-        "danger": "#FB7185",
-        "success": "#34D399",
-    },
-    "retro": {
-        "background": "#080D0A",
-        "card": "#0D1511",
-        "card_alt": "#132019",
-        "card_soft": "#18291F",
-        "border": "#33543F",
-        "accent": "#86EFAC",
-        "accent_2": "#FBBF24",
-        "accent_3": "#5EEAD4",
-        "warning": "#F59E0B",
-        "danger": "#F87171",
-        "success": "#22C55E",
-    },
-    "minimalista": {
-        "background": "#0A0F18",
-        "card": "#111827",
-        "card_alt": "#172033",
-        "card_soft": "#1F2937",
-        "border": "#334155",
-        "accent": "#CBD5E1",
-        "accent_2": "#60A5FA",
-        "accent_3": "#94A3B8",
-        "warning": "#FBBF24",
-        "danger": "#F87171",
-        "success": "#34D399",
-    },
-}
-
-
 def _visual_palette(style: object | None = None) -> dict[str, str]:
-    key = str(style or "auto").strip().lower()
-    palette = VISUAL_PALETTES.get(key, VISUAL_PALETTES["auto"])
-    return {**VISUAL_PALETTES["auto"], **palette}
+    return dict(get_visual_preset(style).palette)
 
 
 def _panel(
@@ -320,10 +237,18 @@ class ChartWidget(QWidget):
 class SummaryVisualRenderer:
     def __init__(self, presentation: bool = False, style: object | None = None) -> None:
         self.presentation = presentation
-        self.palette = _visual_palette(style)
-        self.title_size = 42 if presentation else 30
-        self.section_title_size = 28 if presentation else 18
-        self.body_size = 18 if presentation else 14
+        self.preset = get_visual_preset(style)
+        self.palette = dict(self.preset.palette)
+        typography = self.preset.typography
+        self.title_size = (
+            typography.presentation_title_size if presentation else typography.title_size
+        )
+        self.section_title_size = (
+            typography.presentation_section_title_size
+            if presentation
+            else typography.section_title_size
+        )
+        self.body_size = typography.presentation_body_size if presentation else typography.body_size
 
     def render_summary(self, layout: QVBoxLayout, data: dict[str, Any]) -> None:
         sections = data.get("sections") if isinstance(data.get("sections"), list) else []
@@ -389,7 +314,7 @@ class SummaryVisualRenderer:
             elevated=elevated,
             accent=accent or self.palette["border"],
             background=background,
-            radius=18 if self.presentation else 16,
+            radius=self.preset.card_style.radius,
         )
 
     def _hero(
@@ -400,7 +325,11 @@ class SummaryVisualRenderer:
     ) -> QWidget:
         panel = QFrame()
         panel.setObjectName("VisualHeroPanel")
-        panel.setMinimumHeight(280 if self.presentation else 190)
+        panel.setMinimumHeight(
+            self.preset.hero_style.presentation_minimum_height
+            if self.presentation
+            else self.preset.hero_style.minimum_height
+        )
         panel.setStyleSheet(
             f"""
             QFrame#VisualHeroPanel {{
@@ -409,12 +338,12 @@ class SummaryVisualRenderer:
                     stop:0.55 {self.palette['card']},
                     stop:1 {self.palette['card_soft']});
                 border: 1px solid {self.palette['accent_2']};
-                border-radius: {22 if self.presentation else 18}px;
+                border-radius: {self.preset.hero_style.radius}px;
             }}
             """
         )
         layout = QVBoxLayout(panel)
-        margins = 38 if self.presentation else 26
+        margins = self.preset.spacing.hero_margin + (12 if self.presentation else 0)
         layout.setContentsMargins(margins, margins, margins, margins)
         layout.setSpacing(14)
         eyebrow = str(root_subtitle or block.get("eyebrow") or block.get("subtitle") or "").strip()
@@ -873,6 +802,8 @@ class VisualSummaryWidget(QWidget):
         super().__init__()
         self.summary_visual = summary_visual
         self.presentation = presentation
+        data = parse_visual_summary(summary_visual)
+        self.preset = get_visual_preset(data.get("style") if data else "auto")
         self.setObjectName("VisualSummaryWidget")
         self.setStyleSheet(f"QWidget#VisualSummaryWidget {{ background: {COLORS['background']}; }}")
         root = QVBoxLayout(self)
@@ -890,9 +821,15 @@ class VisualSummaryWidget(QWidget):
         content.setObjectName("VisualSummaryContent")
         content.setStyleSheet(f"QWidget#VisualSummaryContent {{ background: {COLORS['background']}; }}")
         self.layout = QVBoxLayout(content)
-        margins = 34 if presentation else 18
+        margins = (
+            self.preset.spacing.presentation_margin
+            if presentation
+            else self.preset.spacing.content_margin
+        )
         self.layout.setContentsMargins(margins, margins, margins, margins)
-        self.layout.setSpacing(20 if presentation else 14)
+        self.layout.setSpacing(
+            self.preset.spacing.presentation_gap if presentation else self.preset.spacing.section_gap
+        )
         scroll.setWidget(content)
         root.addWidget(scroll)
         self._render()
@@ -929,11 +866,17 @@ class PresentationDialog(QDialog):
             """
         )
         self.data = parse_visual_summary(summary_visual)
+        self.preset = get_visual_preset(self.data.get("style") if self.data else "auto")
         self.slides = visual_summary_slides(self.data)
         self.index = 0
         self.root = QVBoxLayout(self)
-        self.root.setContentsMargins(22, 20, 22, 20)
-        self.root.setSpacing(14)
+        self.root.setContentsMargins(
+            self.preset.spacing.panel_margin,
+            self.preset.spacing.panel_margin,
+            self.preset.spacing.panel_margin,
+            self.preset.spacing.panel_margin,
+        )
+        self.root.setSpacing(self.preset.spacing.section_gap)
 
         self.header = QHBoxLayout()
         self.counter = label("", "Muted")
@@ -974,7 +917,12 @@ class PresentationDialog(QDialog):
         wrapper.setObjectName("PresentationSlide")
         wrapper.setStyleSheet(f"QWidget#PresentationSlide {{ background: {COLORS['background']}; }}")
         slide_layout = QVBoxLayout(wrapper)
-        slide_layout.setContentsMargins(34, 26, 34, 26)
+        slide_layout.setContentsMargins(
+            self.preset.spacing.presentation_margin,
+            self.preset.spacing.hero_margin,
+            self.preset.spacing.presentation_margin,
+            self.preset.spacing.hero_margin,
+        )
         slide_layout.addStretch(1)
         slide_layout.addWidget(
             SummaryVisualRenderer(
