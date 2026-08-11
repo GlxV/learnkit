@@ -34,22 +34,37 @@ class CombinedReviewSessionDialog(QDialog):
         storage: LocalStorage,
         block_ids: list[str],
         settings_provider: Callable[[], Mapping[str, object]] | None = None,
+        *,
+        session_title: str = "Revisão combinada",
+        include_summary: bool = True,
+        include_flashcards: bool = True,
+        include_questions: bool = True,
+        include_exam_traps: bool = True,
+        minimum_blocks: int = 2,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.study_session_query_service = StudySessionQueryService(storage, settings_provider)
         self.review_flashcard_use_case = ReviewFlashcardUseCase(storage)
         self.answer_question_use_case = AnswerQuestionUseCase(storage)
-        self.session = self.study_session_query_service.combined_review_session(block_ids)
+        self.session_title = session_title
+        self.session = self.study_session_query_service.combined_review_session(
+            block_ids,
+            include_summary=include_summary,
+            include_flashcards=include_flashcards,
+            include_questions=include_questions,
+            include_exam_traps=include_exam_traps,
+            minimum_blocks=minimum_blocks,
+        )
         self.selected_answers: dict[str, str] = {}
         self.setObjectName("CombinedReviewSessionDialog")
-        self.setWindowTitle(f"Revisão combinada - {len(self.session.blocks)} blocos")
+        self.setWindowTitle(f"{self.session_title} - {len(self.session.blocks)} blocos")
         self.resize(980, 780)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 20, 22, 20)
         layout.setSpacing(14)
-        layout.addWidget(label("Revisão combinada", "Title"))
+        layout.addWidget(label(self.session_title, "Title"))
         layout.addWidget(
             label(
                 "Sessão temporária: seus blocos permanecem separados "
@@ -66,12 +81,15 @@ class CombinedReviewSessionDialog(QDialog):
         content_layout.setContentsMargins(0, 0, 0, 0)
         if self.session.summaries:
             content_layout.addWidget(self._summary_panel())
+        if self.session.exam_traps:
+            content_layout.addWidget(self._exam_traps_panel())
         if self.session.flashcards:
             content_layout.addWidget(self._flashcards_panel())
         if self.session.questions:
             content_layout.addWidget(self._questions_panel())
         if (
             not self.session.summaries
+            and not self.session.exam_traps
             and not self.session.flashcards
             and not self.session.questions
         ):
@@ -154,6 +172,24 @@ class CombinedReviewSessionDialog(QDialog):
                 )
                 actions.addWidget(action)
             layout.addLayout(actions)
+        return card
+
+    def _exam_traps_panel(self) -> QWidget:
+        card = panel()
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(12)
+        layout.addWidget(label("Pegadinhas de prova", "SectionTitle"))
+        for trap in self.session.exam_traps:
+            layout.addWidget(
+                self._origin_tag(self._origin_titles(trap.origins)),
+                alignment=Qt.AlignmentFlag.AlignLeft,
+            )
+            layout.addWidget(label(trap.title, "SmallTitle"))
+            body = QTextBrowser()
+            body.setMarkdown(trap.text)
+            body.setMaximumHeight(130)
+            layout.addWidget(body)
         return card
 
     def _questions_panel(self) -> QWidget:

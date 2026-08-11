@@ -26,6 +26,13 @@ class CombinedReviewSummaryDTO:
 
 
 @dataclass(slots=True)
+class CombinedExamTrapDTO:
+    title: str
+    text: str
+    origins: list[CombinedReviewOriginDTO] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class CombinedFlashcardDTO:
     question: str
     answer: str
@@ -44,5 +51,6 @@ class CombinedQuestionDTO:
 class CombinedReviewSessionDTO:
     blocks: list[CombinedReviewBlockDTO] = field(default_factory=list)
     summaries: list[CombinedReviewSummaryDTO] = field(default_factory=list)
+    exam_traps: list[CombinedExamTrapDTO] = field(default_factory=list)
     flashcards: list[CombinedFlashcardDTO] = field(default_factory=list)
     questions: list[CombinedQuestionDTO] = field(default_factory=list)

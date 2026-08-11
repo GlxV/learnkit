@@ -90,6 +90,26 @@ def test_studies_page_selects_multiple_blocks_and_can_clear_selection(tmp_path: 
     page.close()
 
 
+def test_exam_review_selection_resolves_subject_to_child_blocks(tmp_path: Path) -> None:
+    app = _qapp()
+    from PySide6.QtCore import Qt
+    from app.application.query_services.ui_data_provider import UIDataProvider
+    from app.ui.pages.exam_review_dialog import ExamReviewSelectionDialog
+
+    storage, first, second = _blocks(tmp_path)
+    dialog = ExamReviewSelectionDialog(UIDataProvider(storage))
+    dialog.show()
+    app.processEvents()
+
+    subject_item = dialog.tree.topLevelItem(0)
+    subject_item.setCheckState(0, Qt.CheckState.Checked)
+    app.processEvents()
+
+    assert set(dialog.selected_block_ids()) == {first.id, second.id}
+    assert dialog.selection().include_exam_traps is True
+    dialog.close()
+
+
 def test_studies_page_clears_combined_selection_when_scope_changes_or_page_is_hidden(
     tmp_path: Path,
 ) -> None:

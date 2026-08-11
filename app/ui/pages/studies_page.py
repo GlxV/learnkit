@@ -31,6 +31,7 @@ from app.ui.components.summary_visual import PresentationDialog, VisualSummaryWi
 from app.ui.feedback import log_action, show_toast
 from app.ui.pages.base import panel, scroll_page
 from app.ui.pages.combined_review_dialog import CombinedReviewSessionDialog
+from app.ui.pages.exam_review_dialog import ExamReviewSelectionDialog
 from app.ui.theme import COLORS
 
 
@@ -293,6 +294,11 @@ class StudiesPage(QWidget):
 
         self.layout.addWidget(label("Estudos", "Title"))
         self.layout.addWidget(label("Escolha um destino real e continue por resumo, flashcards ou perguntas.", "Muted"))
+        exam_review = QPushButton("Revisão para Prova")
+        exam_review.setObjectName("PrimaryButton")
+        exam_review.setToolTip("Selecione matérias, módulos ou blocos para uma revisão virtual.")
+        exam_review.clicked.connect(self._open_exam_review)
+        self.layout.addWidget(exam_review)
 
         if not blocks:
             empty = EmptyState(
@@ -523,6 +529,26 @@ class StudiesPage(QWidget):
             self.storage,
             block_ids,
             settings_provider=self.settings_provider,
+            parent=self,
+        )
+        dialog.exec()
+        self.refresh()
+
+    def _open_exam_review(self) -> None:
+        selection_dialog = ExamReviewSelectionDialog(self.provider, self)
+        if selection_dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        selection = selection_dialog.selection()
+        dialog = CombinedReviewSessionDialog(
+            self.storage,
+            selection.block_ids,
+            settings_provider=self.settings_provider,
+            session_title="Revisão para Prova",
+            include_summary=selection.include_summary,
+            include_flashcards=selection.include_flashcards,
+            include_questions=selection.include_questions,
+            include_exam_traps=selection.include_exam_traps,
+            minimum_blocks=1,
             parent=self,
         )
         dialog.exec()

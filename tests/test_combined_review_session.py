@@ -97,3 +97,44 @@ def test_combined_review_session_includes_three_blocks_even_when_one_has_no_cont
     assert [summary.block_title for summary in session.summaries] == ["Arrays", "Listas Ligadas"]
     assert len(session.flashcards) == 3
     assert len(session.questions) == 2
+
+
+def test_exam_review_filters_content_and_extracts_deduplicated_traps(tmp_path: Path) -> None:
+    storage, arrays, lists = _create_combined_blocks(tmp_path)
+    for block, text in (
+        (arrays, "Não confunda acesso direto com busca sequencial."),
+        (lists, "Não confunda acesso direto com busca sequencial."),
+    ):
+        subject, module, loaded = storage.get_block_by_id(block.id)
+        loaded.summary_visual = (
+            '{"title":"Revisao","sections":['
+            '{"type":"exam_trap","title":"Pegadinha","text":"'
+            + text
+            + '"}]}'
+        )
+        storage.save_block(subject, module, loaded)
+
+    session = StudySessionQueryService(storage).combined_review_session(
+        [arrays.id, lists.id],
+        include_summary=False,
+        include_flashcards=False,
+        include_questions=False,
+        include_exam_traps=True,
+    )
+
+    assert session.summaries == []
+    assert session.flashcards == []
+    assert session.questions == []
+    assert len(session.exam_traps) == 1
+    assert len(session.exam_traps[0].origins) == 2
+
+
+def test_exam_review_can_use_one_block_without_changing_combined_review_contract(tmp_path: Path) -> None:
+    storage, arrays, _lists = _create_combined_blocks(tmp_path)
+
+    session = StudySessionQueryService(storage).combined_review_session(
+        [arrays.id],
+        minimum_blocks=1,
+    )
+
+    assert [block.block_id for block in session.blocks] == [arrays.id]
