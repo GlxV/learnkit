@@ -1148,10 +1148,28 @@ class ImportPage(QWidget):
             show_toast(self, "Gere o prompt antes de abrir o workspace IA.", "warning")
             self._show_wizard_step(2)
             return
+        existing = getattr(self, "ai_workspace_dialog", None)
+        if existing is not None:
+            try:
+                if existing.isVisible():
+                    existing.raise_()
+                    existing.activateWindow()
+                    return
+            except RuntimeError:
+                self.ai_workspace_dialog = None
         provider = get_ai_provider(str(self.ai_provider_combo.currentData() or "gemini"))
-        self.ai_workspace_dialog = AIWorkspaceDialog(provider, prompt, self)
-        self.ai_workspace_dialog.show()
-        log_action("ai_workspace_opened", provider=provider.key, embedded=self.ai_workspace_dialog.web_view is not None)
+        dialog = AIWorkspaceDialog(provider, prompt, self)
+        self.ai_workspace_dialog = dialog
+        if hasattr(dialog, "destroyed"):
+            dialog.destroyed.connect(
+                lambda *_args, current=dialog: self._clear_ai_workspace_reference(current)
+            )
+        dialog.show()
+        log_action("ai_workspace_opened", provider=provider.key, embedded=dialog.web_view is not None)
+
+    def _clear_ai_workspace_reference(self, dialog) -> None:
+        if getattr(self, "ai_workspace_dialog", None) is dialog:
+            self.ai_workspace_dialog = None
 
     def _paste_response_from_clipboard(self) -> None:
         text = QApplication.clipboard().text()
