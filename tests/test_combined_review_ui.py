@@ -83,6 +83,7 @@ def test_studies_page_selects_multiple_blocks_and_can_clear_selection(tmp_path: 
     app.processEvents()
     app.flush_deleted_widgets()
     assert page.selected_review_block_ids == set()
+
     assert not any(
         button.isVisible() and button.text().startswith("Revisar selecionados")
         for button in page.findChildren(QPushButton)
@@ -151,6 +152,32 @@ def test_studies_page_clears_combined_selection_when_scope_changes_or_page_is_hi
     page.hide()
     app.processEvents()
     assert page.selected_review_block_ids == set()
+
+
+def test_studies_page_select_block_switches_to_its_subject_and_module(tmp_path: Path) -> None:
+    app = _qapp()
+
+    from app.application.query_services.ui_data_provider import UIDataProvider
+    from app.core.database import SQLiteStorage
+    from app.ui.pages.studies_page import StudiesPage
+
+    storage = SQLiteStorage(tmp_path / "learnkit.db", migrate_json=False)
+    first_subject = storage.create_subject("Materia existente")
+    first_module = storage.create_module(first_subject.slug, "Modulo existente")
+    storage.create_block(first_subject.slug, first_module.slug, "Bloco existente")
+    qa_subject = storage.create_subject("QA LearnKit")
+    qa_module = storage.create_module(qa_subject.slug, "Modulo 1")
+    qa_block = storage.create_block(qa_subject.slug, qa_module.slug, "Bloco A")
+
+    page = StudiesPage(UIDataProvider(storage), storage)
+    page.select_block_by_id(qa_block.id)
+    app.processEvents()
+
+    assert page.selected_subject_name == "QA LearnKit"
+    assert page.selected_module_name == "Modulo 1"
+    assert page.selected_block_id == qa_block.id
+    assert page.subject_combo.currentText() == "QA LearnKit"
+    assert page.module_combo.currentText() == "Modulo 1"
 
 
 def test_combined_review_dialog_applies_shared_actions_to_each_origin_and_completes_blocks(

@@ -700,6 +700,9 @@ class StudiesPage(QWidget):
         return sorted(blocks, key=lambda item: (item.progress, item.flashcards + item.questions), reverse=True)[0]
 
     def select_block_by_id(self, block_id: str) -> None:
+        context = self.study_session_query_service.block_context(block_id)
+        self.selected_subject_name = context.subject.name
+        self.selected_module_name = context.module.name
         self.selected_block_id = block_id
         self.refresh()
 
