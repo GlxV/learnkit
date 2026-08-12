@@ -99,6 +99,60 @@ def test_duplicate_extraction_request_does_not_start_second_worker(tmp_path, mon
     assert calls == 1
 
 
+def test_prepared_extraction_reaches_import_request_after_response_validation(
+    tmp_path, monkeypatch
+) -> None:
+    import app.ui.pages.import_page as import_page_module
+
+    page = _page(tmp_path, monkeypatch)
+    material = tmp_path / "material.md"
+    extracted_text = "Texto extraido que precisa chegar ao salvamento."
+    material.write_text(extracted_text, encoding="utf-8")
+    monkeypatch.setattr(import_page_module.webbrowser, "open", lambda _url: True)
+
+    requests = []
+    execute_import = page.import_package_use_case.execute
+
+    def capture_import(request):
+        requests.append(request)
+        return execute_import(request)
+
+    page.import_package_use_case.execute = capture_import
+    page.subject_combo.setCurrentText("Biologia")
+    page.module_combo.setCurrentText("Citologia")
+    page.block_title.setText("Membrana")
+    page._add_files([material])
+
+    page.prepare_button.click()
+    assert _wait_until(lambda: bool(page.prompt_preview.toPlainText().strip()))
+    assert _wait_until(lambda: not page.has_active_extraction())
+    assert extracted_text in page.text_preview.toPlainText()
+    assert "caracteres" in page.extraction_stats.text()
+    assert "palavras" in page.extraction_stats.text()
+
+    # The prepared package owns the accepted extraction independently from the
+    # transient worker result reference used while extraction is running.
+    page.extraction_result = None
+    page.ai_response.setPlainText(
+        """
+        {
+          "schema_version": "learnkit.study_package.v1",
+          "summary_text": "Resumo valido.",
+          "summary_visual": {},
+          "flashcards": [{"front": "Pergunta?", "back": "Resposta."}],
+          "questions": []
+        }
+        """
+    )
+    page.validate_button.click()
+    page._continue_from_response()
+    page.save_button.click()
+
+    assert len(requests) == 1
+    assert extracted_text in requests[0].extraction.combined_content.text
+    assert extracted_text in page.current_block.extracted_content.text
+
+
 def test_external_browser_failure_is_reported(tmp_path, monkeypatch) -> None:
     import app.ui.pages.import_page as import_page_module
 

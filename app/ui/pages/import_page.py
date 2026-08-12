@@ -163,6 +163,7 @@ class ImportPage(QWidget):
         self.selected_files: list[Path] = []
         self.file_statuses: dict[str, tuple[str, str]] = {}
         self.extraction_result: FileExtractionResult | None = None
+        self.prepared_extraction_result: FileExtractionResult | None = None
         self.prompt_text = ""
         self.parsed_response: StudyPackageDTO | None = None
         self.validation_report: StudyPackageValidationDTO | None = None
@@ -1215,6 +1216,7 @@ class ImportPage(QWidget):
         self.selected_files = []
         self.file_statuses = {}
         self.extraction_result = None
+        self.prepared_extraction_result = None
         self.prompt_text = ""
         self.parsed_response = None
         self.current_block = None
@@ -1252,6 +1254,7 @@ class ImportPage(QWidget):
     def _reset_outputs_after_file_change(self) -> None:
         self._invalidate_extraction_context()
         self.extraction_result = None
+        self.prepared_extraction_result = None
         self.prompt_text = ""
         self.parsed_response = None
         self.current_block = None
@@ -1443,6 +1446,7 @@ class ImportPage(QWidget):
             extracted_content=self.extraction_result.combined_content,
             options=options,
         )
+        self.prepared_extraction_result = self.extraction_result
         self.prompt_preview.setPlainText(self.prompt_text)
         self.copy_button.setEnabled(True)
         self._set_step_status(3, "done")
@@ -1522,7 +1526,8 @@ class ImportPage(QWidget):
         self._update_context_card()
 
     def _save_block(self) -> None:
-        if not self.extraction_result or not self.extraction_result.combined_content.text.strip():
+        extraction = self.prepared_extraction_result
+        if not extraction or not extraction.combined_content.text.strip():
             show_toast(self, "Extraia o texto antes de salvar.", "warning")
             return
         if not self.prompt_preview.toPlainText().strip():
@@ -1568,7 +1573,7 @@ class ImportPage(QWidget):
             set_button_loading(self.save_button, True, "Salvando...")
             result = self.import_package_use_case.execute(
                 StudyPackageImportDTO(
-                    extraction=self.extraction_result,
+                    extraction=extraction,
                     generated_prompt=self.prompt_preview.toPlainText(),
                     raw_ai_response=self.ai_response.toPlainText(),
                     package=self.parsed_response,
