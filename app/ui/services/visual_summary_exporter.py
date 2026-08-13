@@ -93,6 +93,21 @@ class VisualSummaryExportService:
             table.setFixedHeight(header_height + content_height + frame_height + 4)
             table.doItemsLayout()
 
+            # Changing a nested widget to a fixed height does not invalidate the
+            # cached size hints of its ancestor layouts. Without refreshing the
+            # whole chain, the export canvas keeps its pre-expansion height and
+            # clips long tables even though the table's own scrollbar is gone.
+            widget: QWidget | None = table
+            while widget is not None:
+                widget.updateGeometry()
+                ancestor_layout = widget.layout()
+                if ancestor_layout is not None:
+                    ancestor_layout.invalidate()
+                    ancestor_layout.activate()
+                if widget is canvas:
+                    break
+                widget = widget.parentWidget()
+
     def save_png(self, summary_visual: str, path: str | Path, *, width: int = 1280) -> Path:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)

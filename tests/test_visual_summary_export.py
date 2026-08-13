@@ -145,9 +145,10 @@ def test_visual_summary_export_expands_scrollable_tables(monkeypatch) -> None:
 
     monkeypatch.setattr(SummaryVisualRenderer, "render_summary", render_and_capture)
 
-    VisualSummaryExportService().render_image(visual, width=900)
+    image = VisualSummaryExportService().render_image(visual, width=900)
 
     assert captured["table"].verticalScrollBar().maximum() == 0
+    assert image.height() >= captured["table"].height() + 100
 
 
 def test_visual_summary_export_rejects_unbounded_bitmap_allocation() -> None:
